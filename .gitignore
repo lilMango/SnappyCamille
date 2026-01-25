@@ -1,0 +1,11 @@
+# Source project directories (each has its own git repo)
+birthday-music-world/
+
+# macOS
+.DS_Store
+
+# Claude
+.claude/
+
+# Other build artifacts
+*.zip
