@@ -3,6 +3,10 @@
 # FTP Deploy Script for SnappyCamille
 # Uploads contents of public/ to PorkBun hosting
 
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Load credentials from .env file
 if [ -f .env ]; then
   source .env
