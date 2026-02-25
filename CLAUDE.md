@@ -19,17 +19,20 @@ Requires `.env` with FTP credentials (copy from `.env.example`). Uses lftp for m
 - `public/` - Deployment folder (uploaded to server root)
 - `public/index.html` - Root redirect
 - `public/bday33/` - Built output from birthday-music-world
+- `public/cnm-world/` - Built output from cnm-world
 - Sub-project source folders are in `.gitignore` (separate repos)
 
 ## Adding Sub-projects
 
-1. Set `"homepage": "/route-name"` in sub-project's package.json
-2. Build sub-project and copy output to `public/route-name/`
-3. Add source folder to `.gitignore`
-4. Deploy with `./deploy.sh`
+1. Create a `vite.config.js` in the sub-project with `base: '/route-name'`
+2. Run `bun install && bun run build` — output goes to `dist/`
+3. Copy `dist/` to `public/route-name/`
+4. Add source folder to `.gitignore`
+5. Deploy with `./deploy.sh`
 
 ## Current Sub-projects
 
 | Route | Source | Description |
 |-------|--------|-------------|
-| `/bday33` | birthday-music-world/ | Interactive pixel-art music room (React, grid-based game with zone-based playlists) |
+| `/bday33` | birthday-music-world/ | Interactive pixel-art music room (React, Vite, grid-based game with zone-based playlists) |
+| `/cnm-world` | cnm-world/ | 2D pixel-art world engine (React, Vite, room-based exploration) |

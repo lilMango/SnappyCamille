@@ -41,13 +41,15 @@ This uploads everything in `public/` to your server root.
 ## Adding a new sub-project
 
 1. Create project folder in SnappyCamille root
-2. Set `"homepage": "/route-name"` in its package.json
-3. Build and copy output to `public/route-name/`
-4. Add project folder to `.gitignore`
-5. Run `./deploy.sh`
+2. Set `base: '/route-name'` in the sub-project's `vite.config.js`
+3. Run `bun install && bun run build` — output goes to `dist/`
+4. Copy `dist/` to `public/route-name/`
+5. Add project folder to `.gitignore`
+6. Run `./deploy.sh`
 
 ## Sub-projects
 
 | Route | Project | Description |
 |-------|---------|-------------|
 | `/bday33` | birthday-music-world | Interactive pixel-art music room |
+| `/cnm-world` | cnm-world | 2D pixel-art world engine |
