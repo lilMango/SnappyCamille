@@ -1,0 +1,9 @@
+export const TILES = {
+  EMPTY: 0,
+  WALL: 1,
+  FLOOR_WOOD: 2,
+  FLOOR_CARPET: 3,
+  FLOOR_TILE: 4,
+  FLOOR_STONE: 5,
+  FLOOR_GRASS: 6,
+};

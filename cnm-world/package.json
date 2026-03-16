@@ -1,0 +1,34 @@
+{
+  "name": "cnm-world",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "lucide-react": "^0.344.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.0"
+  },
+  "scripts": {
+    "start": "vite --port 1338",
+    "dev": "vite --port 1338",
+    "build": "vite build",
+    "preview": "vite preview --port 1338",
+    "build:deploy": "vite build && rm -rf ../public/cnm-world && cp -r dist ../public/cnm-world",
+    "test": "vitest"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

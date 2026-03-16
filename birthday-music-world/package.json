@@ -1,0 +1,34 @@
+{
+  "name": "birthday-music-world",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.0"
+  },
+  "scripts": {
+    "start": "vite --port 1337",
+    "dev": "vite --port 1337",
+    "build": "vite build",
+    "preview": "vite preview --port 1337",
+    "build:deploy": "vite build && rm -rf ../public/bday33 && cp -r dist ../public/bday33 && ../deploy.sh",
+    "test": "vitest"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

@@ -1,6 +1,3 @@
-# Source project directories (each has its own git repo)
-birthday-music-world/
-
 # FTP credentials (never commit!)
 .env
 
@@ -10,6 +7,10 @@ birthday-music-world/
 # Claude
 .claude/
 
-# Other build artifacts
+# Build artifacts
 *.zip
-cnm-world/
+birthday-music-world/node_modules/
+cnm-world/node_modules/
+birthday-music-world/dist/
+cnm-world/dist/
+birthday-music-world/build/
