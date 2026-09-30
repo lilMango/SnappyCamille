@@ -1,7 +1,6 @@
 # Source project directories (each has its own git repo)
 birthday-music-world/
 camille-galaxy/
-lanikai-galaxy/
 
 # FTP credentials (never commit!)
 .env
