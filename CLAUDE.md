@@ -33,3 +33,5 @@ Requires `.env` with FTP credentials (copy from `.env.example`). Uses lftp for m
 | Route | Source | Description |
 |-------|--------|-------------|
 | `/bday33` | birthday-music-world/ | Interactive pixel-art music room (React, grid-based game with zone-based playlists) |
+| `/galaxy` | camille-galaxy/ | 3D Mario-Galaxy-style Getty Villa on a small planet (Vite + React Three Fiber, spherical walking, follow camera, music zones) |
+| `/lanikai` | lanikai-galaxy/ | 3D Wii-Sports-Resort-style Kualoa Ranch & Lanikai Beach on a small planet (Vite + React Three Fiber, spherical walking, follow camera, music zones) |
