@@ -99,8 +99,8 @@ function pickTarget(s, pack) {
 }
 
 /** Deterministic, validated spawn spots around HOME. */
-function spawnPoints() {
-  const home = polarToDir(HOME.d, HOME.theta);
+function spawnPoints(homePos, COUNT) {
+  const home = polarToDir(homePos.d, homePos.theta);
   const out = [];
   let k = 0;
   while (out.length < COUNT && k < 400) {
@@ -122,12 +122,12 @@ function spawnPoints() {
   return out;
 }
 
-export default function RaptorPack() {
+export default function RaptorPack({ home = HOME, count = COUNT }) {
   const groups = useRef([]);
 
   const pack = useMemo(
     () =>
-      spawnPoints().map((pos, i) => ({
+      spawnPoints(home, count).map((pos, i) => ({
         pos,
         target: pos.clone(),
         heading: Math.random() * Math.PI * 2,
@@ -138,7 +138,7 @@ export default function RaptorPack() {
         palette: RAPTOR_PALETTES[i % RAPTOR_PALETTES.length],
         init: false,
       })),
-    []
+    [home, count]
   );
 
   useFrame((_, rawDt) => {

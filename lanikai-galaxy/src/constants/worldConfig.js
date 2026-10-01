@@ -8,6 +8,7 @@ export const PLANET_RADIUS = 30;
 // Character
 export const WALK_SPEED = 8; // world units / second along the surface
 export const TURN_SPEED = 2.6; // radians / second
+export const SWIM_SPEED = 5; // world units / second while swimming
 export const CHARACTER_HEIGHT = 1.7; // approx, for foot offset
 export const ORIENT_DECAY = 12; // slerp decay for character facing
 

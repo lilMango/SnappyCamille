@@ -32,6 +32,8 @@ const Character = forwardRef(function Character(_props, ref) {
   const armL = useRef();
   const armR = useRef();
   const body = useRef();
+  const pivot = useRef();
+  const stroke = useRef(0);
   const t = useRef(0);
 
   // Smooth lathed torso: a halter-top silhouette revolved around Y.
@@ -56,20 +58,32 @@ const Character = forwardRef(function Character(_props, ref) {
   useEffect(() => addOutlines(root.current, 0.026), []);
 
   useFrame((_, dt) => {
+    const sw = player.swim;
     t.current += dt * 9.5;
-    const amp = 0.55 * player.speed;
+    stroke.current += dt * (2.5 + 3.5 * player.speed);
+    const amp = 0.55 * player.speed * (1 - sw);
     const s = Math.sin(t.current) * amp;
-    if (legL.current) legL.current.rotation.x = s;
-    if (legR.current) legR.current.rotation.x = -s;
-    if (armL.current) armL.current.rotation.x = -s * 0.7;
-    if (armR.current) armR.current.rotation.x = s * 0.7;
-    if (body.current) body.current.position.y = Math.abs(Math.cos(t.current)) * 0.04 * player.speed;
+    const k = Math.sin(stroke.current);
+    // Swimming: lie forward in the water (pivot at the hip), crawl arms
+    // reaching overhead in alternation, flutter kick, gentle idle bob.
+    const reach = 0.4 + 0.6 * player.speed;
+    if (legL.current) legL.current.rotation.x = s + Math.sin(t.current * 1.4) * 0.3 * sw * reach;
+    if (legR.current) legR.current.rotation.x = -s - Math.sin(t.current * 1.4) * 0.3 * sw * reach;
+    if (armL.current) armL.current.rotation.x = -s * 0.7 * (1 - sw) + (-2.6 + k * 0.9 * reach) * sw;
+    if (armR.current) armR.current.rotation.x = s * 0.7 * (1 - sw) + (-2.6 - k * 0.9 * reach) * sw;
+    if (pivot.current) {
+      pivot.current.rotation.x = sw * 1.15;
+      pivot.current.position.y = 0.9 - sw * 0.55 + Math.sin(stroke.current * 0.8) * 0.03 * sw;
+    }
+    if (body.current)
+      body.current.position.y = -0.9 + Math.abs(Math.cos(t.current)) * 0.04 * player.speed * (1 - sw);
   });
 
   return (
     <group ref={ref} dispose={null}>
       <group ref={root}>
-        <group ref={body}>
+        <group ref={pivot} position={[0, 0.9, 0]}>
+        <group ref={body} position={[0, -0.9, 0]}>
           {/* ==== Legs: smooth capsules, pivot at hip y=0.8 ==== */}
           {[
             { r: legL, x: -0.1 },
@@ -217,6 +231,7 @@ const Character = forwardRef(function Character(_props, ref) {
             <torusGeometry args={[0.085, 0.024, 10, 20]} />
             <meshToonMaterial color="#c9b08a" gradientMap={grad()} />
           </mesh>
+        </group>
         </group>
       </group>
     </group>

@@ -1,20 +1,42 @@
+import { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import { PLANET_RADIUS } from '../constants/worldConfig';
-import { SUN_DIR } from './SkyDome';
+import { SUN_DIR, sky } from '../utils/skyCycle';
 
 /**
- * Bright tropical noon: a strong, near-white sun along SUN_DIR (matching the
- * sky dome's sun disk), a sky-white / warm-sand hemisphere fill (a green ground tint turned the sand olive), a soft
- * opposite-side bounce light, and a daylight park HDRI for the image-based ambient on the terrain.
+ * Golden-hour lighting whose tint follows the two-hemisphere sky (see
+ * utils/skyCycle.js): a warm low sun that goes peach over the lagoon half and
+ * pink over the cotton-candy half, a matching hemisphere fill, an opposite-side
+ * bounce so the far side never goes dark, and the daylight park HDRI for ambient.
  */
 export default function Lighting({ highQuality = true }) {
-  const sunPos = SUN_DIR.clone().multiplyScalar(PLANET_RADIUS * 3).toArray();
+  const sun = useRef();
+  const hemi = useRef();
+  const bounce = useRef();
+
+  useFrame(() => {
+    if (sun.current) {
+      sun.current.position.copy(SUN_DIR).multiplyScalar(PLANET_RADIUS * 3);
+      sun.current.color.copy(sky.sun);
+    }
+    if (hemi.current) {
+      hemi.current.color.copy(sky.hemiSky);
+      hemi.current.groundColor.copy(sky.hemiGround);
+    }
+    if (bounce.current) {
+      bounce.current.position.copy(SUN_DIR).multiplyScalar(-PLANET_RADIUS * 3);
+      bounce.current.color.copy(sky.bounce);
+    }
+  });
+
   return (
     <>
-      <hemisphereLight args={['#eef8ff', '#f3e2b8', 0.95]} />
+      <hemisphereLight ref={hemi} args={['#eef8ff', '#f3e2b8', 0.95]} />
       <directionalLight
-        position={sunPos}
-        intensity={1.75}
+        ref={sun}
+        position={SUN_DIR.clone().multiplyScalar(PLANET_RADIUS * 3).toArray()}
+        intensity={1.7}
         color="#fff7e6"
         castShadow
         shadow-mapSize-width={highQuality ? 2048 : 1024}
@@ -27,10 +49,8 @@ export default function Lighting({ highQuality = true }) {
         shadow-camera-bottom={-PLANET_RADIUS * 1.4}
         shadow-bias={-0.0004}
       />
-      {/* Soft sky-blue bounce from the opposite side, so the far side of the
-          little planet reads as bright daytime too instead of falling to night. */}
-      <directionalLight position={SUN_DIR.clone().multiplyScalar(-PLANET_RADIUS * 3).toArray()} intensity={1.2} color="#d6ecff" />
-      <Environment preset="park" environmentIntensity={0.45} />
+      <directionalLight ref={bounce} position={SUN_DIR.clone().multiplyScalar(-PLANET_RADIUS * 3).toArray()} intensity={1.2} color="#d6ecff" />
+      <Environment preset="park" environmentIntensity={0.4} />
     </>
   );
 }

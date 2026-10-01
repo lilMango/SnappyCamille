@@ -1,7 +1,5 @@
 import { PLANET_RADIUS } from './worldConfig';
 import {
-  OCEAN,
-  SHORE,
   BEACH_END,
   RIDGES,
   RIDGE_COLLIDE,
@@ -27,13 +25,22 @@ export function offset(northMeters, eastMeters) {
 // surface meters (north/east from lat0,lon0) — kept for parity with
 // camille-galaxy's walker, but nothing on the island needs one yet.
 // CIRCLE_COLLIDERS are { lat, lon, radius (radians) }.
+// Offshore landmark islets. Mokoli'i ("Chinaman's Hat") is the steep cone; Na
+// Mokulua are the twin rounded islets off Lanikai. `r` is the no-swim radius in
+// meters (the islet's surf ring + a margin); she can swim around them.
+export const ISLETS = [
+  { ...dirToLatLon(polarToDir(0.36, 55)), kind: 'mokolii', r: 6.2 },
+  { ...dirToLatLon(polarToDir(0.4, -30)), kind: 'mokunui', r: 7.4 },
+  { ...dirToLatLon(polarToDir(0.42, -48)), kind: 'mokuiki', r: 4.9 },
+];
+
 export const RECT_COLLIDERS = [];
 
 export const CIRCLE_COLLIDERS = (() => {
   const out = [];
-  // The ocean: one big cap. Its radius sits a hair inside the waterline so she
-  // can stand in the surf, but never wade out (the islets stay backdrop-only).
-  out.push({ ...OCEAN, radius: SHORE - 0.015 });
+  // The lagoon is open for swimming (see useSphereWalker); only the offshore
+  // islets block her, so she swims around them instead of through them.
+  for (const i of ISLETS) out.push({ lat: i.lat, lon: i.lon, radius: i.r / PLANET_RADIUS });
 
   // Cliff bases: a chain of circles along each ridge centerline (~2m apart),
   // each RIDGE_COLLIDE meters in radius — the union is a capsule hugging the
@@ -115,14 +122,5 @@ export const TREES = (() => {
   }
   return out;
 })();
-
-// Offshore landmark islets (backdrop only — they sit in the blocked ocean).
-// Mokoli'i ("Chinaman's Hat") is the steep cone; Na Mokulua are the twin
-// rounded islets off Lanikai.
-export const ISLETS = [
-  { ...dirToLatLon(polarToDir(0.36, 55)), kind: 'mokolii' },
-  { ...dirToLatLon(polarToDir(0.4, -30)), kind: 'mokunui' },
-  { ...dirToLatLon(polarToDir(0.42, -48)), kind: 'mokuiki' },
-];
 
 export const PEAK_LATLON = dirToLatLon(PEAK_DIR);

@@ -3,34 +3,36 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PLANET_RADIUS } from '../constants/worldConfig';
 import { player } from '../store';
-import { orientOnSurface } from '../utils/sphere';
-
-// Sun direction (shared with Lighting). A high tropical-noon sun sitting almost
-// overhead of the beach spawn (spawn up = +X), tipped a little east so trees
-// and cliffs still cast readable shadows, and lighting the lagoon, the beach
-// and the Kualoa valley together.
-export const SUN_DIR = new THREE.Vector3(0.8, -0.1, 0.5).normalize();
-
-const ZENITH = new THREE.Color('#1f86e8'); // saturated Wii-Resort blue
-const MID = new THREE.Color('#58b4f5');
-const HORIZON = new THREE.Color('#d8f1ff'); // pale haze at the horizon
+import { orientOnSurface, Y_AXIS } from '../utils/sphere';
+import { SUN_DIR, CANDY_AXIS, BLEND, PALETTES, sky, tickSky, candyFactor } from '../utils/skyCycle';
 
 /**
- * Sky gradient keyed to the PLAYER's local up (not world +Y), so the horizon
- * is always pale and the zenith always deep blue wherever you stand on the
- * little planet. The camera sits ~5m above a 30m planet, so the true horizon
- * dips ~30° below eye level — the gradient is biased accordingly.
+ * Sky gradient keyed to the PLAYER's local up (pale horizon / saturated zenith
+ * wherever you stand), with two palettes — blue sunset and cotton candy — mixed
+ * per pixel by the WORLD direction of the view ray against the candy axis. The
+ * camera sits ~5m above a 30m planet, so the true horizon dips ~30 degrees
+ * below eye level; the gradient is biased accordingly.
  */
 function skyMaterial() {
+  const B = PALETTES.blue;
+  const C = PALETTES.candy;
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     fog: false,
     uniforms: {
       uUp: { value: player.up.clone() },
-      uZenith: { value: ZENITH },
-      uMid: { value: MID },
-      uHorizon: { value: HORIZON },
+      uAxis: { value: CANDY_AXIS },
+      uBlend: { value: BLEND },
+      uZenB: { value: B.zenith },
+      uMidB: { value: B.mid },
+      uHorB: { value: B.horizon },
+      uZenC: { value: C.zenith },
+      uMidC: { value: C.mid },
+      uHorC: { value: C.horizon },
+      uSun: { value: SUN_DIR },
+      uGlowB: { value: new THREE.Color('#ffb066') },
+      uGlowC: { value: new THREE.Color('#ff7fc0') },
     },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
@@ -42,15 +44,42 @@ function skyMaterial() {
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uUp;
-      uniform vec3 uZenith;
-      uniform vec3 uMid;
-      uniform vec3 uHorizon;
+      uniform vec3 uAxis;
+      uniform float uBlend;
+      uniform vec3 uZenB;
+      uniform vec3 uMidB;
+      uniform vec3 uHorB;
+      uniform vec3 uZenC;
+      uniform vec3 uMidC;
+      uniform vec3 uHorC;
+      uniform vec3 uSun;
+      uniform vec3 uGlowB;
+      uniform vec3 uGlowC;
       varying vec3 vWorld;
       void main() {
         vec3 dir = normalize(vWorld - cameraPosition);
         float t = dot(dir, normalize(uUp));
-        vec3 col = mix(uHorizon, uMid, smoothstep(-0.5, 0.05, t));
-        col = mix(col, uZenith, smoothstep(0.05, 0.85, t));
+
+        // 0 = blue-sunset hemisphere, 1 = cotton-candy hemisphere (by view direction)
+        float m = smoothstep(-uBlend, uBlend, dot(dir, normalize(uAxis)));
+
+        vec3 hor = mix(uHorB, uHorC, m);
+        vec3 mid = mix(uMidB, uMidC, m);
+        vec3 zen = mix(uZenB, uZenC, m);
+        vec3 col = mix(hor, mid, smoothstep(-0.5, 0.05, t));
+        col = mix(col, zen, smoothstep(0.05, 0.85, t));
+
+        // Sunset glow around the (low) sun, tinted by whichever sky it sits in.
+        float sd = max(dot(dir, normalize(uSun)), 0.0);
+        float low = 1.0 - smoothstep(0.0, 0.8, abs(t));
+        vec3 glow = mix(uGlowB, uGlowC, m);
+        col += glow * (pow(sd, 3.0) * 0.35 + pow(sd, 28.0) * 0.6) * (0.4 + 0.6 * low);
+
+        // A soft pink-violet seam where the two skies meet, so the blend feels
+        // like a wash of cotton candy rather than a muddy mix.
+        float seam = 1.0 - abs(m * 2.0 - 1.0);
+        col += vec3(0.16, 0.05, 0.14) * seam * seam * (0.5 + 0.5 * low);
+
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }
@@ -108,25 +137,39 @@ const CLOUDS = (() => {
   return out;
 })();
 
+const _cd = new THREE.Vector3();
+
 function Clouds() {
   const group = useRef();
-  const mat = useMemo(
+  const geo = useMemo(() => new THREE.IcosahedronGeometry(1, 3), []);
+  // One material per cloud so each can take the tint of the hemisphere it floats over.
+  const mats = useMemo(
     () =>
-      new THREE.MeshToonMaterial({
-        color: '#ffffff',
-        gradientMap: cloudGradient(),
-        emissive: '#c4ddf7',
-        emissiveIntensity: 0.12,
-        fog: false,
-        toneMapped: false, // keep them bright white under ACES
-      }),
+      CLOUDS.map(
+        () =>
+          new THREE.MeshToonMaterial({
+            color: '#ffffff',
+            gradientMap: cloudGradient(),
+            emissive: '#c4ddf7',
+            emissiveIntensity: 0.12,
+            fog: false,
+            toneMapped: false, // keep them bright under ACES
+          })
+      ),
     []
   );
-  const geo = useMemo(() => new THREE.IcosahedronGeometry(1, 3), []);
 
-  // Slow drift around the planet.
+  // Slow drift around the planet; tint follows which hemisphere each cloud is over.
   useFrame((_, dt) => {
-    if (group.current) group.current.rotation.y += dt * 0.006;
+    const g = group.current;
+    if (!g) return;
+    g.rotation.y += dt * 0.006;
+    CLOUDS.forEach((c, i) => {
+      _cd.copy(c.pos).normalize().applyAxisAngle(Y_AXIS, g.rotation.y);
+      const m = candyFactor(_cd);
+      mats[i].color.copy(PALETTES.blue.cloud).lerp(PALETTES.candy.cloud, m);
+      mats[i].emissive.copy(mats[i].color).multiplyScalar(0.5);
+    });
   });
 
   return (
@@ -135,7 +178,7 @@ function Clouds() {
         <group key={i} position={c.pos} quaternion={c.quat}>
           {c.puffs.map(([x, y, z, r], k) => (
             // flattened a touch so the bottoms read flat, like cumulus
-            <mesh key={k} geometry={geo} material={mat} position={[x, y, z]} scale={[r, r * 0.78, r]} />
+            <mesh key={k} geometry={geo} material={mats[i]} position={[x, y, z]} scale={[r, r * 0.78, r]} />
           ))}
         </group>
       ))}
@@ -144,19 +187,30 @@ function Clouds() {
 }
 
 /**
- * Bright tropical sky: a player-up-relative blue gradient dome, big fluffy
- * cel-shaded 3D cumulus clouds floating around the planet, and a hot white sun
- * disk + halo at SUN_DIR (Lighting aims the sun light along the same vector).
+ * Two-hemisphere sky: a blue sunset over the lagoon half, cotton-candy purple /
+ * pink / orange over the far half, blending between (see utils/skyCycle.js),
+ * plus fluffy clouds tinted by the hemisphere they drift over and a low
+ * golden-hour sun disk at SUN_DIR. This component also refreshes the shared
+ * `sky` state each frame (it mounts first, so Lighting / Water see fresh values)
+ * and drives the fog + clear color from the horizon she is facing.
  */
 export default function SkyDome() {
   const mat = useMemo(skyMaterial, []);
   const R = PLANET_RADIUS * 16;
   const sunPos = SUN_DIR.clone().multiplyScalar(R * 0.72);
+  const fwd = useMemo(() => new THREE.Vector3(), []);
 
-  // Ease the gradient's "up" toward the player's local up.
-  useFrame((_, dt) => {
-    const u = mat.uniforms.uUp.value;
-    u.lerp(player.up, 1 - Math.exp(-4 * Math.min(dt, 1 / 30))).normalize();
+  useFrame(({ scene, camera }, rawDt) => {
+    const dt = Math.min(rawDt, 1 / 30);
+    // Ease the gradient's "up" toward the player's local up.
+    mat.uniforms.uUp.value.lerp(player.up, 1 - Math.exp(-4 * dt)).normalize();
+
+    camera.getWorldDirection(fwd);
+    tickSky(player.up, fwd);
+
+    // Fog + clear color follow the horizon (eased so turning doesn't pop).
+    if (scene.fog) scene.fog.color.lerp(sky.fog, 1 - Math.exp(-5 * dt));
+    if (scene.background && scene.background.isColor) scene.background.copy(scene.fog ? scene.fog.color : sky.fog);
   });
 
   return (
@@ -167,19 +221,19 @@ export default function SkyDome() {
 
       <Clouds />
 
-      {/* Sun: bright core + two soft halo shells */}
+      {/* Sun: warm core + two soft halo shells */}
       <group position={sunPos.toArray()}>
         <mesh>
           <sphereGeometry args={[R * 0.03, 24, 24]} />
-          <meshBasicMaterial color="#fffdf2" fog={false} toneMapped={false} />
+          <meshBasicMaterial color="#fff4e0" fog={false} toneMapped={false} />
         </mesh>
         <mesh>
           <sphereGeometry args={[R * 0.05, 24, 24]} />
-          <meshBasicMaterial color="#fff6c8" transparent opacity={0.45} fog={false} toneMapped={false} depthWrite={false} />
+          <meshBasicMaterial color="#ffd49a" transparent opacity={0.45} fog={false} toneMapped={false} depthWrite={false} />
         </mesh>
         <mesh>
           <sphereGeometry args={[R * 0.1, 24, 24]} />
-          <meshBasicMaterial color="#fff1b0" transparent opacity={0.16} fog={false} toneMapped={false} depthWrite={false} />
+          <meshBasicMaterial color="#ffb7c8" transparent opacity={0.18} fog={false} toneMapped={false} depthWrite={false} />
         </mesh>
       </group>
     </group>

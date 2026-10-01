@@ -20,6 +20,7 @@ export const player = {
   grounded: true,
   camFlipSeq: 0, // incremented on each turn-around, so the camera can orbit around
 
+  swim: 0, // 0..1 how deep in the water she is (0 = walking, 1 = swimming)
   speed: 0, // 0..1 normalized, for walk-anim blending
 };
 

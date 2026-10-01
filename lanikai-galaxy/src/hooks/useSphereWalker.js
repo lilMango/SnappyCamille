@@ -3,10 +3,11 @@ import { useRef } from 'react';
 import * as THREE from 'three';
 import { player } from '../store';
 import { tangentFrame, surfaceQuaternion, latLonToDir, angularDistance } from '../utils/sphere';
-import { terrainHeight } from '../utils/terrain';
+import { terrainHeight, oceanPolar, SHORE } from '../utils/terrain';
 import {
   PLANET_RADIUS,
   WALK_SPEED,
+  SWIM_SPEED,
   TURN_SPEED,
   ORIENT_DECAY,
   JUMP_SPEED,
@@ -84,12 +85,19 @@ export function useSphereWalker(groupRef, inputRef) {
       .addScaledVector(player.forward, input.forward)
       .addScaledVector(_right, input.strafe);
 
+    // Water depth: wading starts at the waterline and she is fully swimming
+    // ~2m out (smoothstep), which also sets the swim speed and pose.
+    const inWater = THREE.MathUtils.clamp((SHORE - oceanPolar(player.posDir).d) / 0.07, 0, 1);
+    const swimTarget = inWater * inWater * (3 - 2 * inWater);
+    player.swim += (swimTarget - player.swim) * Math.min(1, dt * 8);
+    const speed = WALK_SPEED + (SWIM_SPEED - WALK_SPEED) * player.swim;
+
     const moving = _move.lengthSq() > 1e-6;
     player.speed += ((moving ? 1 : 0) - player.speed) * Math.min(1, dt * 10);
 
     if (moving) {
       _move.normalize();
-      const angularStep = (WALK_SPEED * dt) / PLANET_RADIUS;
+      const angularStep = (speed * dt) / PLANET_RADIUS;
       // Try the direct step first; if blocked, deflect the move direction in
       // widening steps so she slides along walls instead of freezing. If the
       // CURRENT position is somehow inside a collider, always allow escape.

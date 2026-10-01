@@ -3,8 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PLANET_RADIUS } from '../constants/worldConfig';
 import { OCEAN_DIR, SHORE, BEACH_END } from '../utils/terrain';
+import { SPAWN_LAT, SPAWN_LON } from '../constants/worldConfig';
+import { latLonToDir } from '../utils/sphere';
 import { Y_AXIS } from '../utils/sphere';
-import { SUN_DIR } from './SkyDome';
+import { SUN_DIR } from '../utils/skyCycle';
 
 /**
  * Animated water overlay — a separate transparent mesh laid over the lagoon cap
@@ -33,6 +35,15 @@ const DEEP_TINT = new THREE.Color('#1462d6');
 const RIM = new THREE.Color('#c8f0ff'); // sky-ish rim at grazing angles
 const GLINT = new THREE.Color('#ffffff');
 const WET = new THREE.Color('#a8844c'); // wet Lanikai sand (a darker WET_SAND)
+
+// Fixed tangent basis around the ocean center for the low-poly facet lattice
+// (same E1/E2 construction as terrain.js: E1 points at the spawn).
+const FACET_E1 = (() => {
+  const sp = latLonToDir(SPAWN_LAT, SPAWN_LON);
+  return sp.clone().addScaledVector(OCEAN_DIR, -sp.dot(OCEAN_DIR)).normalize();
+})();
+const FACET_E2 = new THREE.Vector3().crossVectors(OCEAN_DIR, FACET_E1).normalize();
+const FACET_SIZE = 0.35; // meters across one low-poly triangle cell
 
 const LIFT = 0.04; // water sits just above the flat (height 0) lagoon
 const SAND_LIFT = 0.03; // beach strip hovers just above the sand
@@ -123,6 +134,9 @@ function waterMaterial() {
         uRim: { value: RIM },
         uGlint: { value: GLINT },
         uWet: { value: WET },
+        uE1: { value: FACET_E1 },
+        uE2: { value: FACET_E2 },
+        uFacet: { value: FACET_SIZE },
       },
     ]),
     vertexShader: /* glsl */ `
@@ -168,8 +182,17 @@ function waterMaterial() {
       uniform vec3 uRim;
       uniform vec3 uGlint;
       uniform vec3 uWet;
+      uniform vec3 uE1;
+      uniform vec3 uE2;
+      uniform float uFacet;
       varying vec3 vWorld;
       varying float vD;
+
+      float hash21(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
 
       // Straight-alpha "over": paint (src, srcA) on top of dst.
       vec4 over(vec4 dst, vec3 src, float srcA) {
@@ -185,15 +208,25 @@ function waterMaterial() {
         float swellAmp = 1.0 - smoothstep(uShore - 0.3, uShore - 0.02, vD);
 
         // ---- 1. water body ------------------------------------------------
-        // Normal tilted by the swell gradient + a finer ripple layer.
-        vec3 g;
-        swell(vWorld, uTime, g);
-        vec3 rk1 = vec3(2.3, 1.1, -1.7);
-        vec3 rk2 = vec3(-1.4, 2.6, 1.9);
-        g += 0.006 * cos(dot(vWorld, rk1) + uTime * 2.3) * rk1;
-        g += 0.005 * cos(dot(vWorld, rk2) - uTime * 2.9) * rk2;
-        g *= 5.0 * swellAmp;
-        vec3 n = normalize(up - (g - dot(g, up) * up));
+        // Low-poly facets: a triangle lattice laid on the water in azimuthal-
+        // equidistant coords around the ocean center (continuous, no seams).
+        // Each triangle gets its own gently animated tilt, so the surface reads
+        // as flat, randomly lit polygons instead of smooth ripples.
+        vec2 pr = vec2(dot(up, uE1), dot(up, uE2));
+        vec2 p2 = uRadius * vD * normalize(pr + 1e-6) / uFacet;
+        vec2 k = vec2(p2.x - p2.y * 0.57735, p2.y * 1.1547);
+        vec2 cell = floor(k);
+        vec2 f = fract(k);
+        float tri = step(1.0, f.x + f.y);
+        vec2 fid = cell + tri * vec2(0.37, 0.61);
+        float h1 = hash21(fid);
+        float h2 = hash21(fid + 17.3);
+        float h3 = hash21(fid + 71.9);
+        float tt = uTime * 0.55;
+        vec2 tilt = vec2(sin(tt + h1 * 6.283), sin(tt * 0.8 + h2 * 6.283)) * 0.34;
+        vec3 t1 = normalize(cross(up, uE1));
+        vec3 t2 = cross(up, t1);
+        vec3 n = normalize(up + (t1 * tilt.x + t2 * tilt.y) * swellAmp);
 
         // Depth ramp (same as coastFactors' "deep"), fading to nothing just
         // inside the waterline so the painted surf line shows through.
@@ -201,25 +234,26 @@ function waterMaterial() {
         float edge = 1.0 - smoothstep(uShore - 0.07, uShore - 0.01, vD);
 
         float ndl = dot(n, l);
-        float lit = mix(0.82, 1.0, smoothstep(0.1, 0.2, ndl)); // two-band toon
+        float lit = 0.72 + 0.45 * clamp(ndl, 0.0, 1.0); // per-facet flat shading
         vec3 col = mix(uShallow, uDeep, deep) * lit;
-        float alpha = mix(0.16, 0.6, deep);
+        // Facets drift between greener-teal and bluer tones, like the reference.
+        col = mix(col, col * vec3(0.78, 0.95, 1.12), h3 * 0.7);
+        col *= 0.9 + 0.2 * h1;
+        float alpha = mix(0.16, 0.6, deep) * (0.88 + 0.24 * h2);
 
         // Fresnel-ish rim, modest + tinted so it doesn't wash to mint.
         float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
         col = mix(col, uRim, fres * 0.45);
         alpha += fres * 0.25;
 
-        // Hard-edged (cel) sun highlight.
+        // Sun glints land on whole facets: broad highlight lobe, hard cutoff.
         vec3 hv = normalize(l + v);
-        float spec = pow(max(dot(n, hv), 0.0), 90.0);
-        float specBand = smoothstep(0.45, 0.55, spec);
+        float spec = pow(max(dot(n, hv), 0.0), 60.0);
+        float specBand = smoothstep(0.35, 0.45, spec);
 
-        // Scrolling procedural sparkle: product of drifting sines, thresholded.
-        vec3 q = vWorld * 3.1;
-        float s = sin(q.x * 1.3 + uTime * 1.1) * sin(q.y * 1.7 - uTime * 0.8) * sin(q.z * 1.1 + uTime * 1.4);
-        s *= sin(dot(q, vec3(0.9, -1.2, 0.7)) - uTime * 1.9);
-        float sparkle = smoothstep(0.55, 0.7, s) * smoothstep(0.0, 0.5, ndl) * (0.35 + 0.65 * deep);
+        // A few pale facets flash white as they tilt through the light.
+        float flash = smoothstep(0.93, 0.97, h1) * smoothstep(0.85, 0.95, sin(uTime * 0.9 + h2 * 40.0));
+        float sparkle = flash * smoothstep(0.0, 0.5, ndl) * (0.35 + 0.65 * deep);
 
         float glint = clamp(specBand + sparkle, 0.0, 1.0);
         col = mix(col, uGlint, glint);
@@ -278,6 +312,7 @@ export default function Water() {
 
   useFrame((_, dt) => {
     mat.uniforms.uTime.value += Math.min(dt, 1 / 20);
+    mat.uniforms.uSun.value.copy(SUN_DIR);
   });
 
   return <mesh geometry={geometry} material={mat} quaternion={quat} renderOrder={1} raycast={() => null} />;

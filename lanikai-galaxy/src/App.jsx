@@ -12,6 +12,8 @@ import Island from './components/Island';
 import SkyDome from './components/SkyDome';
 import RaptorPack from './components/creatures/RaptorPack';
 import PterodactylFlock from './components/creatures/PterodactylFlock';
+import BigDinos from './components/creatures/BigDinos';
+import DolphinPod from './components/creatures/DolphinPod';
 import Player from './components/Player';
 import FollowCamera from './components/FollowCamera';
 import AudioController from './components/AudioController';
@@ -52,7 +54,10 @@ export default function App() {
           <Water />
           <Island />
           <RaptorPack />
+          <RaptorPack home={{ d: 2.9, theta: -40 }} count={3} />
           <PterodactylFlock />
+          <BigDinos />
+          <DolphinPod />
           <Player inputRef={inputRef} />
           {started && <AudioController />}
         </Suspense>
