@@ -16,9 +16,10 @@ Vite + React 18 + React Three Fiber (`@react-three/fiber`, `@react-three/drei`),
 
 ## Commands
 ```bash
-npm run dev          # dev server on http://localhost:1339/lanikai/
-npm run build        # static build to build/
-npm run build:deploy # build -> copy to ../public/lanikai -> ../deploy.sh (FTP)
+bun install          # first time (bun.lock; same package manager as cnm-world)
+bun run dev          # dev server on http://localhost:1339/lanikai/
+bun run build        # static build to build/
+bun run build:deploy # build -> copy to ../public/lanikai -> ../deploy.sh (FTP)
 ```
 `vite.config.js` sets `base: '/lanikai/'`; runtime assets load from
 `import.meta.env.BASE_URL` so they resolve under the subpath.
