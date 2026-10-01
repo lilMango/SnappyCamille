@@ -1,5 +1,4 @@
-# Source project directories (each has its own git repo)
-birthday-music-world/
+# Source project directories that keep their own git repo
 camille-galaxy/
 
 # FTP credentials (never commit!)
@@ -11,5 +10,10 @@ camille-galaxy/
 # Claude
 .claude/
 
-# Other build artifacts
+# Build artifacts
 *.zip
+birthday-music-world/node_modules/
+cnm-world/node_modules/
+birthday-music-world/dist/
+cnm-world/dist/
+birthday-music-world/build/
