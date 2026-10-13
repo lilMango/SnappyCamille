@@ -27,6 +27,7 @@ bun install          # first time (bun.lock; same package manager as the sibling
 bun run dev          # dev server on http://localhost:1340/godzilla-verse/
 bun run build        # static build to build/
 bun run preview      # serve build/ on :1340 — use this to test the subpath + workers
+bun test             # mesher + voxel-world unit tests (bun's built-in runner; pure JS, no WebGL)
 bun run build:deploy # build -> copy to ../public/godzilla-verse -> ../deploy.sh (FTP)
 ```
 `vite.config.js` sets `base: '/godzilla-verse/'`; runtime assets load from
@@ -43,8 +44,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | Phase | Status |
 |---|---|
 | 0 Scaffold + route + pipeline | **done** |
-| 1 Voxel core | next |
-| 2–10 | see plan |
+| 1 Voxel core | **done** |
+| 2 Worker meshing + packing + AO + budgets (+ perf gate) | next |
+| 3–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -67,9 +69,46 @@ lives only in the main checkout. Deploy from the main checkout.
   `text/javascript` under the subpath by `vite preview`.
 - In a headless browser: atlas probe OK (17 tiles, 320 px) and module-worker probe OK
   (transferable round trip, ~4 ms).
-- **Not verified:** the textured cube actually rendering — the headless browser used here
-  cannot create a WebGL context. Check it by eye on the first real load.
+- The gstack headless browser cannot create WebGL. For visual checks use Playwright's
+  Chromium directly: `~/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-mac-arm64/chrome-headless-shell
+  --no-sandbox --use-angle=swiftshader --use-gl=angle --enable-unsafe-swiftshader --ignore-gpu-blocklist
+  --virtual-time-budget=15000 --screenshot=out.png <url>` (software GL, so ~1 fps).
 - **Not verified:** the live FTP host. The probe HUD is how to check it after deploying.
+
+### Phase 1 — voxel core (what exists)
+- `constants/worldConfig.js` — column 16x16, **4 sections of 32** = 128 tall, `GROUND_Y = 20`,
+  padded-copy dims (18x34x18). `constants/blocks.js` — block ids, per-face tiles, `SOLID` /
+  `OPAQUE` lookups, `BLOCK_UV` (Uint16 per block per face), baked `FACE_SHADE_U8`.
+- `utils/voxelWorld.js` — `VoxelWorld`: `Map` of `Column`s (numeric `colKey`), lazily allocated
+  `Uint8Array(8192)` sections indexed `x | z<<4 | y<<8`, `getBlock/setBlock/fillBox`, `topY`,
+  `heightTop`, and the dirty `Set`. `markDirtyAround` dirties all 3x3x3 neighbours on a border
+  (AO in phase 2 samples diagonals). `buildPadded()` makes the 18x34x18 copy the mesher reads.
+- `utils/mesher.js` — **pure** culled-quad mesher (`meshSection(pad)`): no THREE, no DOM, no
+  world access, so phase 2 moves it into a worker unchanged. Emits the packed layout
+  (Uint8 position / Uint16 UV / Uint8 colour, ~10 B/vertex; Uint32 indices only past 65 535 verts).
+- `utils/atlasLayout.js` — pure tile/UV math split out of `atlas.js` so workers don't import THREE.
+- `utils/chunkGeometry.js`, `chunkMaterial.js`, `chunkMeshManager.js` — upload packed arrays as-is,
+  precomputed bounds, one shared `MeshBasicMaterial` (atlas + vertex colours + fog, baked lighting,
+  `toneMapped:false`), imperative mesh map with a nearest-first, time-budgeted remesh pump.
+- `components/ChunkRenderer.jsx` — one `<group>`; chunk meshes are not React children.
+- `components/FlyCamera.jsx` + `hooks/usePointerLock.js` — click to capture the mouse; WASD,
+  Space/E up, C/Q down, Shift fast, wheel = speed, **G = wireframe**, Esc releases.
+- `components/DebugPanel.jsx` + `StatsProbe.jsx` — fps, draw calls, triangles, geometries,
+  sections, quads, dirty queue, mesh ms. Reads the mutable `stats` object at ~4 Hz.
+- `utils/testWorld.js` — 64x64 crossroads with hollow towers that cross the y=32/64 section
+  borders, an open door, rubble, and a floating cube straddling x/y/z borders.
+
+**Debug URL params:** `?cam=x,y,z,yawDeg,pitchDeg` starts the camera there; `?wire=1` starts in wireframe.
+Handy for reproducible screenshots, e.g. the border cube: `?cam=16,36,44,0,-14`.
+
+**Meshing baseline (bun, test world):** 41 sections / 39 388 quads; ~0.03 ms to build the padded copy
+and ~0.07 ms to mesh a typical section; whole test world ~4 ms on the main thread.
+
+**Verified in phase 1:** `bun test` (16 tests: face counts, outward winding of every triangle,
+culling across section borders incl. a cube meeting 8 sections, 32-bit index switch, dirty marking,
+height tracking); a real render via Playwright's Chromium + SwiftShader (textures, lit windows,
+lane lines, seams, hollow interiors, wireframe) with a clean console. Frame rate there is
+software-rendered (~1 fps) so it says nothing about real performance — that is the phase-2 gate.
 
 ## Conventions (house style)
 - **Mutable state outside React.** Per-frame data (player, camera, kaiju, ODM) lives in

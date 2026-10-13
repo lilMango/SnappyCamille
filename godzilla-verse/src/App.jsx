@@ -2,13 +2,17 @@ import { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { AdaptiveDpr, Loader, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
-import AtlasCube from './components/AtlasCube';
+import ChunkRenderer from './components/ChunkRenderer';
+import DebugPanel from './components/DebugPanel';
+import FlyCamera from './components/FlyCamera';
 import GlErrorBoundary from './components/GlErrorBoundary';
 import ProbeHud from './components/ProbeHud';
+import StatsProbe from './components/StatsProbe';
 import { useGame } from './store';
 import { TILES, ATLAS_SIZE } from './utils/atlas';
 
-const SKY = '#0b1020';
+// Daytime placeholder for the phase-1 test world; the city (phase 4) goes dusk/night.
+const SKY = '#9ccaf0';
 
 // Phase 0 probe: a module worker created the same way the real mesh/city workers
 // will be. If this reports OK on the deployed host, `base` + workers are proven.
@@ -60,18 +64,19 @@ export default function App() {
           }}
         >
           <color attach="background" args={[SKY]} />
-          <fog attach="fog" args={[SKY, 8, 30]} />
-          <PerspectiveCamera makeDefault fov={55} near={0.1} far={400} position={[0, 1.2, 6]} />
+          <fog attach="fog" args={[SKY, 110, 300]} />
+          <PerspectiveCamera makeDefault fov={70} near={0.1} far={600} />
           <AdaptiveDpr pixelated />
-          <hemisphereLight args={['#bcd4ff', '#1a1420', 0.9]} />
-          <directionalLight position={[4, 6, 3]} intensity={2.2} />
           <Suspense fallback={null}>
-            <AtlasCube />
+            <ChunkRenderer />
           </Suspense>
+          <FlyCamera />
+          <StatsProbe />
         </Canvas>
         <Loader />
       </GlErrorBoundary>
       <ProbeHud />
+      <DebugPanel />
     </>
   );
 }

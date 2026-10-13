@@ -1,43 +1,14 @@
 import * as THREE from 'three';
 import { mulberry32 } from './rng';
+import { TILE, GUTTER, CELL, GRID, ATLAS_SIZE, TILES, cellOrigin } from './atlasLayout';
 
 /**
  * Procedural Minecraft-style texture atlas, painted to a canvas at runtime —
- * no image assets to source, host or deploy.
- *
- * Layout: TILE px of content inside a CELL px cell. The extra GUTTER px on every
- * side replicate the tile's edge pixels so mipmapping never bleeds a neighbouring
- * tile across a block edge (the classic voxel-atlas bug, very visible on distant
- * facades). UVs are additionally inset half a texel.
+ * no image assets to source, host or deploy. Where each tile lives (and the UV
+ * math) is in atlasLayout.js so workers can use it without importing THREE.
  */
 
-export const TILE = 16;
-export const GUTTER = 2;
-export const CELL = TILE + GUTTER * 2; // 20
-export const GRID = 16; // 16 x 16 cells
-export const ATLAS_SIZE = CELL * GRID; // 320
-
-// Tile names, in atlas order. Index = tile id used by BLOCK_DEFS.
-export const TILES = [
-  'concrete',
-  'concrete_dark',
-  'concrete_light',
-  'brick',
-  'asphalt',
-  'asphalt_line',
-  'sidewalk',
-  'glass',
-  'glass_lit',
-  'steel',
-  'rubble',
-  'dirt',
-  'stone',
-  'grass_top',
-  'grass_side',
-  'water',
-  'dust',
-];
-export const TILE_INDEX = Object.fromEntries(TILES.map((n, i) => [n, i]));
+export { TILE, GUTTER, CELL, GRID, ATLAS_SIZE, TILES, TILE_INDEX, tileUV } from './atlasLayout';
 
 // ---- painters -------------------------------------------------------------
 // Each paints a TILE x TILE square at the context origin; the atlas builder
@@ -161,10 +132,6 @@ const PAINTERS = {
 
 // ---- atlas ----------------------------------------------------------------
 
-function cellOrigin(index) {
-  return { x: (index % GRID) * CELL, y: Math.floor(index / GRID) * CELL };
-}
-
 /** Paint every tile into a canvas, gutters included. Pure canvas, no THREE. */
 export function paintAtlasCanvas() {
   const canvas = document.createElement('canvas');
@@ -207,19 +174,4 @@ export function atlasTexture() {
     _texture.needsUpdate = true;
   }
   return _texture;
-}
-
-/**
- * UV rectangle of a tile's *content* (gutter excluded), inset half a texel.
- * Returns [u0, v0, u1, v1] with v up (three.js convention, canvas y flipped).
- */
-export function tileUV(name) {
-  const i = typeof name === 'number' ? name : TILE_INDEX[name];
-  const { x, y } = cellOrigin(i);
-  const half = 0.5;
-  const u0 = (x + GUTTER + half) / ATLAS_SIZE;
-  const u1 = (x + GUTTER + TILE - half) / ATLAS_SIZE;
-  const vTop = 1 - (y + GUTTER + half) / ATLAS_SIZE;
-  const vBot = 1 - (y + GUTTER + TILE - half) / ATLAS_SIZE;
-  return [u0, vBot, u1, vTop];
 }

@@ -7,6 +7,7 @@
     "dev": "vite --port 1340",
     "build": "vite build",
     "preview": "vite preview --port 1340",
+    "test": "bun test",
     "build:deploy": "vite build && rm -rf ../public/godzilla-verse && cp -r build ../public/godzilla-verse && ../deploy.sh"
   },
   "dependencies": {
