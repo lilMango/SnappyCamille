@@ -9,6 +9,7 @@ import GlErrorBoundary from './components/GlErrorBoundary';
 import ProbeHud from './components/ProbeHud';
 import StatsProbe from './components/StatsProbe';
 import { useGame } from './store';
+import { FOG_FAR, FOG_NEAR } from './constants/worldConfig';
 import { TILES, ATLAS_SIZE } from './utils/atlas';
 
 // Daytime placeholder for the phase-1 test world; the city (phase 4) goes dusk/night.
@@ -64,8 +65,8 @@ export default function App() {
           }}
         >
           <color attach="background" args={[SKY]} />
-          <fog attach="fog" args={[SKY, 110, 300]} />
-          <PerspectiveCamera makeDefault fov={70} near={0.1} far={600} />
+          <fog attach="fog" args={[SKY, FOG_NEAR, FOG_FAR]} />
+          <PerspectiveCamera makeDefault fov={70} near={0.1} far={400} />
           <AdaptiveDpr pixelated />
           <Suspense fallback={null}>
             <ChunkRenderer />

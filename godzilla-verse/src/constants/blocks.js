@@ -20,6 +20,7 @@ export const B = {
   GLASS_LIT: 13,
   STEEL: 14,
   RUBBLE: 15,
+  FENCE: 16, // cutout: alpha-tested see-through lattice
 };
 
 // Face order everywhere in the engine: +x, -x, +y, -y, +z, -z.
@@ -48,6 +49,7 @@ const DEFS = [
   { id: B.GLASS_LIT, name: 'glass_lit', tiles: 'glass_lit' },
   { id: B.STEEL, name: 'steel', tiles: 'steel' },
   { id: B.RUBBLE, name: 'rubble', tiles: 'rubble' },
+  { id: B.FENCE, name: 'fence', tiles: 'fence', cutout: true },
 ];
 
 function expandTiles(t) {
@@ -60,6 +62,7 @@ export const BLOCK_DEFS = [];
 // Flat lookups for hot loops (index = block id).
 export const SOLID = new Uint8Array(256); // blocks collision / is meshed
 export const OPAQUE = new Uint8Array(256); // hides the faces of neighbours behind it
+export const CUTOUT = new Uint8Array(256); // meshed in the alpha-tested pass, hides nothing
 // Per block, per face: [u0, v0, u1, v1] as normalised Uint16 (0..65535).
 export const BLOCK_UV = new Uint16Array(256 * 6 * 4);
 
@@ -67,7 +70,8 @@ for (const d of DEFS) {
   const tiles = expandTiles(d.tiles);
   BLOCK_DEFS[d.id] = { id: d.id, name: d.name, tiles };
   SOLID[d.id] = 1;
-  OPAQUE[d.id] = 1;
+  OPAQUE[d.id] = d.cutout ? 0 : 1;
+  CUTOUT[d.id] = d.cutout ? 1 : 0;
   for (let f = 0; f < 6; f++) {
     const uv = tileUV(TILE_INDEX[tiles[f]]);
     const o = (d.id * 6 + f) * 4;
@@ -80,3 +84,13 @@ export const FACE_SHADE = [0.72, 0.72, 1.0, 0.55, 0.86, 0.86];
 // Vertex colours are multiplied in *linear* space but the result is encoded to sRGB, so
 // store the shade pre-converted to linear — a 0.55 face then reads as ~55% brightness.
 export const FACE_SHADE_U8 = FACE_SHADE.map((s) => Math.round(Math.pow(s, 2.2) * 255));
+
+// Ambient-occlusion multiplier per vertex, ao = 0 (boxed in) .. 3 (open). Pre-linearised for
+// the same reason as FACE_SHADE_U8, then folded with the face shade: one byte per (face, ao).
+export const AO_CURVE = [0.45, 0.65, 0.82, 1.0];
+export const SHADE_AO = new Uint8Array(6 * 4);
+for (let f = 0; f < 6; f++) {
+  for (let ao = 0; ao < 4; ao++) {
+    SHADE_AO[f * 4 + ao] = Math.round(FACE_SHADE_U8[f] * Math.pow(AO_CURVE[ao], 2.2));
+  }
+}

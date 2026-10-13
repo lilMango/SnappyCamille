@@ -7,9 +7,10 @@ import { PAD_VOLUME, SECTION_H } from '../constants/worldConfig';
 
 const pad = new Uint8Array(PAD_VOLUME);
 
+// The mesher returns { opaque, cutout }; these tests are about the opaque part.
 function meshOf(world, cx, cz, sy) {
   world.buildPadded(cx, cz, sy, pad);
-  return meshSection(pad);
+  return meshSection(pad).opaque;
 }
 
 // Total quads emitted across every section the world has data in.

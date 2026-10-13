@@ -13,11 +13,21 @@ export const stats = {
   triangles: 0,
   geometries: 0,
   textures: 0,
+  world: '',
+  genMs: 0, // time to generate the world
   sections: 0, // non-empty sections in the world
   meshes: 0, // sections currently meshed
+  activeCols: 0, // columns inside the render-distance ring
   quads: 0,
+  gpuMB: 0, // geometry buffer bytes held on the GPU
   dirty: 0, // sections waiting for a remesh
-  meshMs: 0, // main-thread meshing time last frame
+  inFlight: 0, // sections out at a worker
+  workers: 0, // 0 = main-thread fallback
+  latAvg: 0, // worker round trip (dispatch -> geometry applied), ms
+  latMax: 0,
+  uploads: 0, // geometries uploaded this frame
+  meshedTotal: 0,
+  meshMs: 0, // main-thread time spent in the mesh manager last frame
   wireframe: false,
   locked: false, // pointer locked
   speed: 0, // fly speed (m/s)

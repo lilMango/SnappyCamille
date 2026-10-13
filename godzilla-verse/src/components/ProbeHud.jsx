@@ -15,7 +15,7 @@ export default function ProbeHud() {
   };
   return (
     <div style={styles.wrap}>
-      <div style={styles.title}>GODZILLA-VERSE · phase 1</div>
+      <div style={styles.title}>GODZILLA-VERSE · phase 2</div>
       {row('base', probe.base)}
       {row('atlas', probe.atlas)}
       {row('module worker', probe.worker)}

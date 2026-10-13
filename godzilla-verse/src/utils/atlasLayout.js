@@ -34,6 +34,7 @@ export const TILES = [
   'grass_side',
   'water',
   'dust',
+  'fence',
 ];
 export const TILE_INDEX = Object.fromEntries(TILES.map((n, i) => [n, i]));
 

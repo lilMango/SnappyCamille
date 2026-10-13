@@ -120,6 +120,15 @@ const PAINTERS = {
 
   water: (c, r) => noiseFill(c, 0x2f6fb0, 10, r),
 
+  fence(c) {
+    // transparent lattice (alpha-tested in the cutout pass): bars on a clear background
+    c.fillStyle = '#4a5260';
+    for (let i = 0; i < TILE; i += 5) {
+      c.fillRect(i, 0, 2, TILE);
+      c.fillRect(0, i, TILE, 2);
+    }
+  },
+
   dust(c) {
     // soft radial dot for dust/smoke particles
     const g = c.createRadialGradient(8, 8, 0, 8, 8, 8);

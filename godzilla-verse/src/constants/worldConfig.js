@@ -23,6 +23,9 @@ export const PAD_Z = CHUNK_Z + 2; // 18
 export const PAD_Y = SECTION_H + 2; // 34
 export const PAD_VOLUME = PAD_X * PAD_Z * PAD_Y; // 11016
 
-// How far (in chunks) around the camera sections are kept meshed. Phase 4 tunes this
-// together with fog; the phase-1 test world is far smaller than this.
+// How far (in chunks) around the camera sections are kept meshed (the single biggest
+// performance knob: cost grows with its square). Fog is sized so the ring's edge fades
+// out before pop-in is visible: 10 chunks = 160 m.
 export const RENDER_DIST = 10;
+export const FOG_NEAR = 70;
+export const FOG_FAR = 155;

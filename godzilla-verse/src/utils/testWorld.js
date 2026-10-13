@@ -11,7 +11,7 @@ import { hash3 } from './rng';
 
 export const TEST_SIZE = 64;
 
-function hollowTower(world, x0, z0, w, d, h, wall, { windows = true, door = true } = {}) {
+export function hollowTower(world, x0, z0, w, d, h, wall, { windows = true, door = true } = {}) {
   const y0 = GROUND_Y + 1;
   const y1 = GROUND_Y + h;
   const x1 = x0 + w - 1;
@@ -73,6 +73,12 @@ export function buildTestWorld(world) {
 
   // towers, one per quadrant
   hollowTower(world, 5, 5, 14, 14, 16, B.BRICK); // walk-up, stays in section 0
+  // see-through fence ring on its roof (exercises the alpha-tested cutout pass)
+  const fy = GROUND_Y + 17;
+  world.fillBox(5, fy, 5, 18, fy + 1, 5, B.FENCE);
+  world.fillBox(5, fy, 18, 18, fy + 1, 18, B.FENCE);
+  world.fillBox(5, fy, 6, 5, fy + 1, 17, B.FENCE);
+  world.fillBox(18, fy, 6, 18, fy + 1, 17, B.FENCE);
   hollowTower(world, 46, 5, 12, 12, 60, B.CONCRETE_DARK); // crosses y=32 and y=64
   hollowTower(world, 4, 44, 16, 12, 36, B.CONCRETE); // crosses y=32
   // stepped tower with a spire (setbacks)

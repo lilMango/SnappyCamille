@@ -10,14 +10,19 @@ export default function DebugPanel() {
   }, []);
 
   const rows = [
+    ['world', `${s.world} (${s.genMs.toFixed(0)} ms)`],
     ['fps', s.fps.toFixed(0)],
     ['draw calls', s.calls],
     ['triangles', s.triangles.toLocaleString()],
     ['geometries', s.geometries],
     ['sections', `${s.meshes} meshed / ${s.sections} filled`],
+    ['active columns', s.activeCols],
     ['quads', s.quads.toLocaleString()],
-    ['dirty queue', s.dirty],
-    ['mesh ms/frame', s.meshMs.toFixed(2)],
+    ['GPU geometry', `${s.gpuMB.toFixed(1)} MB`],
+    ['dirty / in flight', `${s.dirty} / ${s.inFlight}`],
+    ['workers', s.workers || 'off (main thread)'],
+    ['remesh latency', `${s.latAvg.toFixed(1)} avg · ${s.latMax.toFixed(0)} max ms`],
+    ['mesh mgr ms/frame', s.meshMs.toFixed(2)],
     ['pos', `${s.x.toFixed(0)}, ${s.y.toFixed(0)}, ${s.z.toFixed(0)}`],
     ['fly speed', `${s.speed.toFixed(0)} m/s`],
   ];
@@ -54,7 +59,7 @@ const styles = {
     color: '#e6ecff',
     font: '12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace',
     pointerEvents: 'none',
-    maxWidth: 300,
+    maxWidth: 340,
   },
   title: { letterSpacing: 1.5, color: '#7aa2ff', marginBottom: 4, fontWeight: 600 },
   row: { display: 'flex', justifyContent: 'space-between', gap: 14 },

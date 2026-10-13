@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { easing } from 'maath';
 import { stats } from '../store';
-import { chunkMaterial } from '../utils/chunkMaterial';
+import { chunkWireframe, setChunkWireframe } from '../utils/chunkMaterial';
 import { usePointerLock } from '../hooks/usePointerLock';
 
 // Phase-1 free-fly camera for inspecting the voxel engine. Replaced by the player
@@ -11,7 +11,8 @@ import { usePointerLock } from '../hooks/usePointerLock';
 //   click: capture mouse · WASD move · Space/E up · C/Q down · Shift fast
 //   wheel: fly speed · G: wireframe · Esc: release mouse
 
-const DEFAULT_START = { x: 32, y: 52, z: 108, yaw: 0, pitch: -0.28 };
+const TEST_START = { x: 32, y: 52, z: 108, yaw: 0, pitch: -0.28 };
+const CITY_START = { x: 192, y: 112, z: 345, yaw: 0, pitch: -0.5 }; // above the towers, looking in
 
 // Debug URL params, for reproducible shots: ?cam=x,y,z,yawDeg,pitchDeg  and  ?wire=1
 function readStart() {
@@ -20,7 +21,7 @@ function readStart() {
   if (c.length === 5 && c.every(Number.isFinite)) {
     return { x: c[0], y: c[1], z: c[2], yaw: (c[3] * Math.PI) / 180, pitch: (c[4] * Math.PI) / 180 };
   }
-  return DEFAULT_START;
+  return q.get('world') === 'city' ? CITY_START : TEST_START;
 }
 const START = readStart();
 const MIN_SPEED = 2;
@@ -46,7 +47,7 @@ export default function FlyCamera() {
 
   useEffect(() => {
     camera.position.set(START.x, START.y, START.z);
-    if (new URLSearchParams(window.location.search).get('wire') === '1') chunkMaterial().wireframe = true;
+    if (new URLSearchParams(window.location.search).get('wire') === '1') setChunkWireframe(true);
   }, [camera]);
 
   const onLook = useCallback((dx, dy) => {
@@ -61,10 +62,7 @@ export default function FlyCamera() {
     const down = (e) => {
       s.keys.add(e.code);
       if (e.code === 'Space') e.preventDefault();
-      if (e.code === 'KeyG' && !e.repeat) {
-        const m = chunkMaterial();
-        m.wireframe = !m.wireframe;
-      }
+      if (e.code === 'KeyG' && !e.repeat) setChunkWireframe(!chunkWireframe());
     };
     const up = (e) => s.keys.delete(e.code);
     const blur = () => s.keys.clear();
