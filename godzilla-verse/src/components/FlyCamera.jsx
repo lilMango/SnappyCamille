@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { easing } from 'maath';
 import { stats } from '../store';
@@ -24,34 +24,36 @@ const _up = new THREE.Vector3(0, 1, 0);
 let placed = false; // the very first free-cam mount may place the camera (URL pose)
 
 export default function FlyCamera() {
-  const { camera } = useThree();
   const st = useRef({ speed: 14, vel: new THREE.Vector3() });
 
   useEffect(() => {
-    if (START_FREE && !placed) {
-      placed = true;
-      if (FREE_CAM_START) {
-        camera.position.set(FREE_CAM_START.x, FREE_CAM_START.y, FREE_CAM_START.z);
-        input.yaw = FREE_CAM_START.yaw;
-        input.pitch = FREE_CAM_START.pitch;
-      } else {
-        camera.position.set(SPAWN.x, SPAWN.y + 7, SPAWN.z + 9); // ?free=1: above and behind the spawn
-      }
-    }
-    placed = true;
-
     const s = st.current;
     const wheel = (e) => {
       s.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, s.speed * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     };
     window.addEventListener('wheel', wheel, { passive: true });
     return () => window.removeEventListener('wheel', wheel);
-  }, [camera]);
+  }, []);
 
-  useFrame((_, rawDt) => {
+  useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30); // a hitch must not teleport the camera
     const s = st.current;
     const k = input.keys;
+
+    // First frame only: place the camera at the URL pose. (Done here, not in an effect:
+    // drei swaps in its own default camera after mount, so an effect would move the old one.)
+    if (!placed) {
+      placed = true;
+      if (START_FREE) {
+        if (FREE_CAM_START) {
+          camera.position.set(FREE_CAM_START.x, FREE_CAM_START.y, FREE_CAM_START.z);
+          input.yaw = FREE_CAM_START.yaw;
+          input.pitch = FREE_CAM_START.pitch;
+        } else {
+          camera.position.set(SPAWN.x, SPAWN.y + 7, SPAWN.z + 9); // ?free=1: above and behind the spawn
+        }
+      }
+    }
 
     _euler.set(input.pitch, input.yaw, 0);
     camera.quaternion.setFromEuler(_euler);

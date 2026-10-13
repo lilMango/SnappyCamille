@@ -49,7 +49,7 @@ const read = () =>
     return { mx: g.input.touchMx, mz: g.input.touchMz, sprint: g.input.touchSprint, jump: g.input.touchJump, brk: g.input.breakHeld, plc: g.input.placeHeld, yaw: g.input.yaw, pitch: g.input.pitch, z: g.player.body.z, y: g.player.body.y, grounded: g.player.body.grounded, mode: g.useGame.getState().cameraMode };
   });
 
-await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/`);
+await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?world=test`);
 await waitFor(() => window.__gv && window.__gv.stats.meshes > 20 && window.__gv.player.body.grounded);
 
 const hasButtons = await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean));

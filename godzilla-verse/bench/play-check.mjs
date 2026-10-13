@@ -93,7 +93,7 @@ async function stableTarget(mode = 'ground', timeoutMs = 60000) {
   return null;
 }
 
-await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/`);
+await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?world=test`);
 await waitFor(() => window.__gv && window.__gv.world.columns.size > 0 && window.__gv.stats.dirty === 0 && window.__gv.stats.inFlight === 0 && window.__gv.stats.meshes > 20);
 
 // ---------------- spawn / gravity ----------------

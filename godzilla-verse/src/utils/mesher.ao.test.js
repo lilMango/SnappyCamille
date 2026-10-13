@@ -124,3 +124,47 @@ describe('cutout pass', () => {
     expect(r.cutout.quadCount).toBe(5); // fence loses the face against the stone
   });
 });
+
+describe('self-lit blocks', () => {
+  test('lit windows and neon are emissive: emit = 255 and full-brightness colour, even in a corner', () => {
+    for (const id of [B.GLASS_LIT, B.NEON_PINK, B.NEON_CYAN]) {
+      const w = new VoxelWorld();
+      w.fillBox(4, 5, 4, 8, 5, 8, B.STONE); // floor, so the lit block has occluding neighbours
+      w.setBlock(6, 6, 6, id);
+      w.setBlock(7, 6, 6, B.STONE);
+      const r = meshOf(w, 0, 0, 0);
+      let litVerts = 0;
+      for (let q = 0; q < r.vertexCount; q += 4) {
+        const emissive = r.emit[q] === 255;
+        for (let k = 0; k < 4; k++) {
+          expect(r.emit[q + k]).toBe(emissive ? 255 : 0); // a quad is all one or the other
+          if (emissive) {
+            expect(r.color[(q + k) * 3]).toBe(255); // no face shading, no AO
+            litVerts++;
+          }
+        }
+      }
+      expect(litVerts).toBeGreaterThan(0);
+    }
+  });
+
+  test('ordinary blocks are never emissive', () => {
+    const w = new VoxelWorld();
+    let x = 3;
+    for (const id of [B.GLASS, B.STONE, B.BRICK, B.FENCE, B.LEAVES, B.POOL]) w.setBlock((x += 3), 5, 5, id);
+    const m = meshBoth(w, 0, 0, 0);
+    for (const part of [m.opaque, m.cutout]) {
+      if (!part) continue;
+      for (const e of part.emit) expect(e).toBe(0);
+    }
+  });
+
+  test('leaves go to the cutout pass; the decorative pool is an ordinary opaque block', () => {
+    const w = new VoxelWorld();
+    w.setBlock(5, 5, 5, B.LEAVES);
+    w.setBlock(9, 5, 9, B.POOL);
+    const m = meshBoth(w, 0, 0, 0);
+    expect(m.cutout.quadCount).toBe(6);
+    expect(m.opaque.quadCount).toBe(6);
+  });
+});

@@ -59,6 +59,7 @@ export class VoxelWorld {
     // Section keys needing a remesh. A Set, so a section edited 1000 times in a frame is
     // meshed once.
     this.dirty = new Set();
+    this.bulk = false; // generation mode: no dirty marking / height upkeep until endBulk()
     this._nbr = new Array(9).fill(null); // scratch for buildPadded
   }
 
@@ -117,6 +118,7 @@ export class VoxelWorld {
     if (!col) col = this.ensureColumn(cx, cz);
     if (!sec) sec = col.sections[sy] = new Uint8Array(SECTION_VOLUME);
     sec[idx] = id;
+    if (this.bulk) return old; // counts, heights and dirty marks are rebuilt at endBulk()
 
     col.filled[sy] += (id !== 0 ? 1 : 0) - (old !== 0 ? 1 : 0);
     if (col.filled[sy] === 0) col.sections[sy] = null; // free; the dirty mark removes the mesh
@@ -165,16 +167,61 @@ export class VoxelWorld {
               sec.fill(id, start, start + (lx1 - lx0 + 1));
             }
           }
-          col.filled[sy] = countFilled(sec);
-          if (col.filled[sy] === 0) col.sections[sy] = null;
+          if (!this.bulk) {
+            col.filled[sy] = countFilled(sec);
+            if (col.filled[sy] === 0) col.sections[sy] = null;
+          }
         }
 
-        for (let lz = lz0; lz <= lz1; lz++) {
-          for (let lx = lx0; lx <= lx1; lx++) recomputeHeight(col, lx, lz);
+        if (!this.bulk) {
+          for (let lz = lz0; lz <= lz1; lz++) {
+            for (let lx = lx0; lx <= lx1; lx++) recomputeHeight(col, lx, lz);
+          }
         }
       }
     }
-    this.markDirtyBox(x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 1, z1 + 1);
+    if (!this.bulk) this.markDirtyBox(x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 1, z1 + 1);
+  }
+
+  /**
+   * Bulk mode is for generators: thousands of writes without per-write dirty marking, section
+   * counts or height upkeep. endBulk() rebuilds counts, frees emptied sections and rebuilds every
+   * column's height map once; callers decide what to
+   * mark dirty (the city worker marks nothing — the main thread marks what it adopts).
+   */
+  beginBulk() {
+    this.bulk = true;
+  }
+
+  endBulk() {
+    this.bulk = false;
+    for (const col of this.columns.values()) {
+      for (let sy = 0; sy < SECTIONS; sy++) {
+        const sec = col.sections[sy];
+        if (!sec) continue;
+        col.filled[sy] = countFilled(sec);
+        if (col.filled[sy] === 0) col.sections[sy] = null; // generation left it empty: free it
+      }
+      for (let lz = 0; lz < CHUNK_Z; lz++) {
+        for (let lx = 0; lx < CHUNK_X; lx++) recomputeHeight(col, lx, lz);
+      }
+    }
+  }
+
+  /**
+   * Take ownership of a column built elsewhere (the city worker): its section arrays, filled
+   * counts and height map. Every non-empty section is marked dirty so it gets meshed.
+   */
+  adoptColumn(cx, cz, sections, filled, heightTop) {
+    const col = new Column(cx, cz);
+    for (let sy = 0; sy < SECTIONS; sy++) {
+      col.sections[sy] = sections[sy] || null;
+      col.filled[sy] = filled[sy];
+      if (col.sections[sy]) this.dirty.add(sectionKey(cx, cz, sy));
+    }
+    col.heightTop = heightTop;
+    this.columns.set(colKey(cx, cz), col);
+    return col;
   }
 
   markDirty(key) {

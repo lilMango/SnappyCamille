@@ -28,7 +28,8 @@ bun run dev          # dev server on http://localhost:1340/godzilla-verse/
 bun run build        # static build to build/
 bun run preview      # serve build/ on :1340 — use this to test the subpath + workers
 bun test             # mesher, voxel-world and mesh-manager unit tests (bun's runner; no WebGL needed)
-bun run bench        # perf gate: build the 384x384 synthetic city, mesh it, print sizes + timings
+bun run bench        # perf gate: generate the real city, mesh all of it, print sizes + timings
+                     # (`bun run bench synthetic` = the phase-2 box-tower world)
                      # (browser checks: see "Browser checks" below — bench/*.mjs, need Node >= 20)
 bun run build:deploy # build -> copy to ../public/godzilla-verse -> ../deploy.sh (FTP)
 ```
@@ -49,8 +50,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | 1 Voxel core | **done** |
 | 2 Worker meshing + AO + cutout pass + budgets (+ perf gate) | **done** |
 | 3 Player + physics + camera shell + block editing | **done** |
-| 4 The city (generator, sky, fog, lighting) | next |
-| 5–10 | see plan |
+| 4 The city (generator, sky, fog, lighting, loading screen) | **done** |
+| 5 ODM gear + swing camera | next |
+| 6–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -99,11 +101,13 @@ lives only in the main checkout. Deploy from the main checkout.
 - `utils/testWorld.js` — 64x64 crossroads with hollow towers that cross the y=32/64 section
   borders, an open door, rubble, and a floating cube straddling x/y/z borders.
 
-**URL params** (all parsed in `utils/worldSelect.js`): `?world=city` loads the 384x384 synthetic
-city; `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in it
-at the spawn); `?wire=1` starts in wireframe; `?workers=0` meshes on the main thread; `?rd=N` sets the
-render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on touch
-devices). Handy for reproducible screenshots, e.g. the border cube: `?cam=16,36,44,0,-14`.
+**URL params** (all parsed in `utils/worldSelect.js`): the default world is the **real city** (phase 4);
+`?world=test` is the 64x64 engine test world (daytime; what `play-check`/`touch-check` use) and
+`?world=synthetic` the phase-2 box-tower perf-gate world; `?time=day|dusk|night` (dusk for the city, day for
+the others); `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in
+it at the spawn); `?wire=1` starts in wireframe; `?workers=0` meshes and generates on the main thread;
+`?rd=N` sets the render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on
+touch devices). Handy for reproducible screenshots, e.g. the border cube: `?world=test&cam=16,36,44,0,-14`.
 
 **Verified in phase 1:** face counts, outward winding of every triangle, culling across section
 borders incl. a cube meeting 8 sections, 32-bit index switch, dirty marking, height tracking
@@ -218,20 +222,77 @@ order: floor slabs every 8 (halves interior quads), `RENDER_DIST` 8, `SECTION_H`
 deltas were exercised through the shared `input` object rather than real mouse events); how the movement
 *feels* on a real GPU/mouse (tuning constants are in `playerConfig.js`); touch on a physical phone.
 
+### Phase 4 — the city (what exists)
+**The default world is now the real city.** Dusk over a harbour city: 80 blocks, ~190 buildings, a central park
+with the spawn, a bay with a seawall and a suspension bridge to a lighthouse island, a perimeter "Wall Maria"
+on the west/north/south, lit windows, neon, street lamps, fog, stars and a moon.
+
+- **Layout** (`constants/cityConfig.js`, all the numbers): 384x384; avenues every 48 (10 wide, k = 0..6),
+  streets every 32 (8 wide, m = 0..11); raised 2-wide sidewalks (one block above the road) ring each block and
+  lots are inset a further block; the park replaces the 2x2 blocks (and the avenue/street between) at the centre.
+  Vertical rhythm: ground slab at `BASE_Y`, a floor slab every 4 blocks (`BASE_Y + 4k`), 3-high air rows
+  between, roof slab on a slab row; nothing (spire tips included) above `MAX_TOP = 126`.
+- `utils/cityGen.js` — `generateCity(world, { seed, onProgress })`: pure and **deterministic** (same seed →
+  byte-identical world), ~35–75 ms. Ground, roads (double-yellow avenues, dashed street lines, zebra crossings on
+  every junction arm), block ground, the park (grass, paved paths + plaza, a fountain with a recessed pool and lit
+  spout, benches, lamps, ~35 trees: log + cutout leaves), the bay + bridge + island + lighthouse, the wall,
+  recursive-BSP lot subdivision, buildings, street lamps. Returns `lotMap` (Uint16Array building id per column —
+  replaces a per-voxel id array), `buildings`, `anchors` (roof corners for the phase-5 grapple assist), stats.
+- `utils/cityBuild.js` — the 7 archetypes by district (downtown / midtown / outskirts / waterfront weights):
+  `boxTower` (0–2 setbacks), `glassSlab` (steel + curtain wall + crown), `setbackDeco` (stepped, pilasters, lit crown,
+  spire; the two nearest the park are landmarks), `brickWalkup`, `podiumTower` (storefront podium, fenced terrace,
+  curtain tower), `parkingDeck` (open floors, columns, neon), `lowShop` (storefront + neon sign). **Hollow shells**
+  with a 3x3 core on tall ones, doors you can walk through, three window styles, and **clustered** lit windows
+  (each building picks scattered 2x2 / whole floors / stairwell columns / a bright crown, so facades don't look
+  like TV static), plus rooftop AC units, water towers, antennas with warning lights, helipads, penthouses.
+- `utils/cityWorker.js` + `utils/cityLoader.js` — generation runs in a Web Worker and streams finished columns
+  back as transferables in batches of 48 with progress; `loadCity()` falls back to the main thread (with
+  `world.clear()` first) if workers are unavailable or error. `VoxelWorld` gained **bulk mode**
+  (`beginBulk/endBulk`: no dirty marking, section counts or height upkeep per write; rebuilt once) and
+  `adoptColumn()`.
+- **Self-lit blocks:** `EMIT` lookup (lit windows, neon) → the mesher writes a per-vertex `aEmit` byte (11 B/vertex
+  now) and full-brightness colour; `chunkMaterial` multiplies a shared `worldTint` colour onto everything *except*
+  emissive faces (via `onBeforeCompile`), so dusk/night darken the city while windows keep glowing.
+- **Time of day** (`constants/skyConfig.js`): `SKY_PRESETS` day/dusk/night drive the sky, fog, background, tint, water
+  and the lights on lit objects. `Sky.jsx` (gradient dome following the camera: sun glow, moon, stars, fbm clouds),
+  `Surroundings.jsx` (the bay as a translucent rippling plane over the stone bay floor, plus ground outside the
+  wall), `Lighting.jsx`. New blocks/tiles: E–W lane lines, crosswalks, log, leaves (cutout), neon, planks, pool.
+- `LoadingScreen.jsx` — title card + progress bar driven by `city.pct`/`city.label` while generating, then by the
+  mesh queue; the player waits for `city.generated` and the screen fades once the area around the camera is meshed
+  and quiet (`city.ready`). `window.__gv.city` exposes it.
+- **Perf (`bun run bench`, the real city):** 1 173 filled sections / 1.33 M quads / 71 MB packed in total; generate
+  35 ms; mesh everything 175 ms (0.15 ms/section, worst 2.8 ms); **render ring at the spawn: 44 MB** (plan: ~50 MB),
+  downtown 42 MB. In a browser (software GL): ~313 draw calls from the spawn, 724 sections, worker generation +
+  streaming ~400–600 ms. Real-GPU frame rate is still unmeasured.
+- **Known limitations:** the bay is a plane, not water — falling in lands you on the bay floor under it (no
+  swimming); `?time=` is fixed per load (no cycle); sections beyond the wall are void under the sky haze.
+
+**Verified in phase 4:** `bun test` 78 tests (17 new): generator determinism, every archetype present, height
+ceiling, spawn clearance + a physics walk from the spawn to the fountain, buildings never on roads/park and the lot
+map agrees, every enclosed building has a walkable door, window/lit ratio, a continuous bridge over open water,
+wall/park/road details, anchors are real roof corners, emissive/cutout mesher behaviour. `bench/city-check.mjs`
+(15 checks, worker path + main-thread fallback + day/night; passes in dev and in the production build). The Phase 3
+`play-check`/`touch-check` still pass. Screenshots reviewed: spawn, aerial skyline, street canyon, bridge, wall,
+night park, day. **Bugs found on the way:** `?cam=` placed the wrong camera (drei swaps in its own default camera
+after mount — place on the first frame instead); anchors floated in the air on setback towers (now the highest
+solid at each footprint corner); bulk `fillBox` recounted 8 192 voxels per call (now deferred to `endBulk`).
+
 ### Browser checks
 The gstack `browse` tool cannot create a WebGL context, and Chrome's `--virtual-time-budget` freezes
 `performance.now()` (every timing reads ~0). Use the real-time script, which drives Playwright's Chromium
 with SwiftShader and waits for the mesh queue to settle:
 ```bash
-~/.nvm/versions/node/v24.13.0/bin/node bench/browser-check.mjs /tmp/out.png "world=city&rd=6" 960x600 300
+~/.nvm/versions/node/v24.13.0/bin/node bench/browser-check.mjs /tmp/out.png "cam=197,112,335,0,-22" 960x600 300
 # production build: `bun x vite preview --port 1341` in another shell, then prefix PORT=1341
 ```
 It exits non-zero on any console error/warning (GPU-driver noise excluded). Needs Node >= 20.
 Gameplay and touch have their own scripts (same setup, `PORT=1341` for a production preview):
 ```bash
-~/.nvm/versions/node/v24.13.0/bin/node bench/play-check.mjs /tmp/play 800x500   # 17 end-to-end checks
-~/.nvm/versions/node/v24.13.0/bin/node bench/touch-check.mjs /tmp/touch          # touch controls
+~/.nvm/versions/node/v24.13.0/bin/node bench/play-check.mjs /tmp/play 800x500   # 17 end-to-end checks (test world)
+~/.nvm/versions/node/v24.13.0/bin/node bench/touch-check.mjs /tmp/touch          # touch controls (test world)
+~/.nvm/versions/node/v24.13.0/bin/node bench/city-check.mjs /tmp/city            # the real city, 15 checks
 ```
+(Run them by **absolute path** or from `godzilla-verse/`; a `cd` into `bench/` breaks the relative path.)
 Software GL runs at a few fps and the game clamps dt to 1/30, so simulated time runs slower than wall time:
 every wait in these scripts polls for a *condition*. Two rules learned the hard way — after a teleport, wait for
 a target that has held still across two samples (`stableTarget`), and after dispatching a touch event, poll for

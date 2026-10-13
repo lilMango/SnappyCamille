@@ -120,6 +120,68 @@ const PAINTERS = {
 
   water: (c, r) => noiseFill(c, 0x2f6fb0, 10, r),
 
+  // lane line running along x (for east-west streets; asphalt_line runs along z)
+  asphalt_line_h(c, r) {
+    noiseFill(c, 0x2f3033, 7, r);
+    c.fillStyle = '#e8c547';
+    c.fillRect(0, 7, TILE, 2);
+  },
+
+  // zebra crossing: white bars. _v = bars run along z (crossing an avenue), _h = along x.
+  crosswalk_v(c, r) {
+    noiseFill(c, 0x2f3033, 7, r);
+    c.fillStyle = '#e6e3da';
+    for (let x = 1; x < TILE; x += 5) c.fillRect(x, 0, 3, TILE);
+  },
+  crosswalk_h(c, r) {
+    noiseFill(c, 0x2f3033, 7, r);
+    c.fillStyle = '#e6e3da';
+    for (let y = 1; y < TILE; y += 5) c.fillRect(0, y, TILE, 3);
+  },
+
+  log_side(c, r) {
+    noiseFill(c, 0x5b4128, 10, r);
+    c.fillStyle = 'rgba(30,20,10,0.5)';
+    for (let x = 2; x < TILE; x += 4) c.fillRect(x, 0, 1, TILE);
+  },
+  log_top(c, r) {
+    noiseFill(c, 0x8a6a40, 8, r);
+    c.strokeStyle = 'rgba(60,40,20,0.7)';
+    c.strokeRect(2.5, 2.5, 11, 11);
+    c.strokeRect(5.5, 5.5, 5, 5);
+  },
+
+  // alpha-tested: ~35% of pixels are holes
+  leaves(c, r) {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        if (r() < 0.35) continue;
+        c.fillStyle = jitterColor(0x3f8a34, 22, r);
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+  },
+
+  // glowing sign blocks (emissive in the mesher)
+  neon_pink(c, r) {
+    noiseFill(c, 0xff3fa4, 14, r);
+    c.fillStyle = 'rgba(255,220,240,0.7)';
+    c.fillRect(3, 3, 10, 2);
+    c.fillRect(3, 11, 10, 2);
+  },
+  neon_cyan(c, r) {
+    noiseFill(c, 0x2fe6ff, 14, r);
+    c.fillStyle = 'rgba(220,255,255,0.7)';
+    c.fillRect(3, 3, 10, 2);
+    c.fillRect(3, 11, 10, 2);
+  },
+
+  planks(c, r) {
+    noiseFill(c, 0x9a7446, 9, r);
+    c.fillStyle = 'rgba(50,30,10,0.55)';
+    for (let y = 3; y < TILE; y += 4) c.fillRect(0, y, TILE, 1);
+  },
+
   fence(c) {
     // transparent lattice (alpha-tested in the cutout pass): bars on a clear background
     c.fillStyle = '#4a5260';

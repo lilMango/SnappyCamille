@@ -27,6 +27,23 @@ export const player = {
   eyeZ: SPAWN.z,
 };
 
+// The city: loading state while it generates, then its lot map / buildings / anchors.
+//   state: idle | loading | generated | error     generated: voxel data is in (physics can run)
+//   ready: generated AND the area around the camera is meshed (the loading screen can go)
+export const city = {
+  state: 'idle',
+  generated: false,
+  ready: false,
+  pct: 0, // generation + streaming progress, 0..1
+  label: '', // current generation phase
+  via: '', // 'worker' | 'main thread'
+  error: '',
+  lotMap: null, // Uint16Array(SIZE*SIZE): building id per column, 0 = none
+  buildings: [],
+  anchors: null, // Int16Array of (x, y, z) roof corners, for the grapple assist (phase 5)
+  stats: null,
+};
+
 // The ray block targeting uses; written by CameraRig, read by BlockInteraction.
 export const camState = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1 };
 

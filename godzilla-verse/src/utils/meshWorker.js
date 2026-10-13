@@ -15,7 +15,7 @@ self.onmessage = (e) => {
   const transfer = [];
   for (const part of [opaque, cutout]) {
     if (!part) continue;
-    transfer.push(part.position.buffer, part.uv.buffer, part.color.buffer, part.index.buffer);
+    transfer.push(part.position.buffer, part.uv.buffer, part.color.buffer, part.emit.buffer, part.index.buffer);
   }
   self.postMessage({ id, key, opaque, cutout }, transfer);
 };

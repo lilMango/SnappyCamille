@@ -379,5 +379,5 @@ export class ChunkMeshManager {
 }
 
 function partBytes(p) {
-  return p ? p.position.byteLength + p.uv.byteLength + p.color.byteLength + p.index.byteLength : 0;
+  return p ? p.position.byteLength + p.uv.byteLength + p.color.byteLength + p.emit.byteLength + p.index.byteLength : 0;
 }

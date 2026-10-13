@@ -1,19 +1,26 @@
-// Phase-2 performance gate, CPU/memory half. Run: bun run bench
+// Performance gate, CPU/memory half. Run: bun run bench
 //
-// Builds the 384x384 synthetic city, then meshes it with the real mesher and reports the
-// numbers the architecture was sized against (draw calls and frame rate need a real GPU
-// and are read off the in-page DebugPanel instead: /godzilla-verse/?world=city).
+// Generates the REAL city (src/utils/cityGen.js) and meshes all of it with the real mesher,
+// then reports the numbers the architecture was sized against. Draw calls and frame rate
+// need a real GPU and are read off the in-page DebugPanel instead (default URL).
+//   bun run bench             the real city
+//   bun run bench synthetic   the phase-2 box-tower world, for comparison
 import { VoxelWorld } from '../src/utils/voxelWorld.js';
+import { generateCity } from '../src/utils/cityGen.js';
 import { buildSyntheticCity } from '../src/utils/syntheticCity.js';
 import { meshSection } from '../src/utils/mesher.js';
 import { PAD_VOLUME, SECTIONS, SECTION_VOLUME, RENDER_DIST } from '../src/constants/worldConfig.js';
+import { PARK_CENTER, SIZE } from '../src/constants/cityConfig.js';
 
+const kind = process.argv[2] === 'synthetic' ? 'synthetic' : 'city';
 const mb = (b) => +(b / (1024 * 1024)).toFixed(1);
-const part = (p) => (p ? p.position.byteLength + p.uv.byteLength + p.color.byteLength + p.index.byteLength : 0);
+const part = (p) => (p ? p.position.byteLength + p.uv.byteLength + p.color.byteLength + p.emit.byteLength + p.index.byteLength : 0);
 
-let t = performance.now();
+const t = performance.now();
 const world = new VoxelWorld();
-const { size, towers } = buildSyntheticCity(world);
+let info;
+if (kind === 'city') info = generateCity(world, {}).stats;
+else info = buildSyntheticCity(world);
 const genMs = performance.now() - t;
 
 const sections = [];
@@ -50,32 +57,35 @@ function meshAll(list) {
 meshAll(sections.slice(0, 200)); // warm up the JIT
 const all = meshAll(sections);
 
-// what the render-distance ring keeps resident when the camera is mid-city
-const mid = size / 32;
-const ring = sections.filter((s) => Math.hypot(s.cx - mid, s.cz - mid) <= RENDER_DIST);
-const resident = meshAll(ring);
+// what the render-distance ring keeps resident, at the spawn (the park) and mid-city
+const ringAt = (cx, cz) => meshAll(sections.filter((s) => Math.hypot(s.cx - cx, s.cz - cz) <= RENDER_DIST));
+const spawnRing = ringAt(Math.floor(PARK_CENTER.x / 16), Math.floor(PARK_CENTER.z / 16));
+const downtownRing = ringAt(Math.floor(PARK_CENTER.x / 16) - 3, Math.floor(PARK_CENTER.z / 16) - 4);
 
-const out = {
-  world: { size: `${size}x${size}`, towers, genMs: +genMs.toFixed(0), filledSections: sections.length },
-  voxelDataMB: mb(sections.length * SECTION_VOLUME),
-  meshEverything: {
-    sections: all.sections,
-    meshes: all.meshes,
-    totalMs: +all.ms.toFixed(0),
-    avgMsPerSection: +(all.ms / all.sections).toFixed(3),
-    worstSectionMs: +all.worst.toFixed(2),
-    quads: all.quads,
-    packedMB: mb(all.bytes),
-    bytesPerVertex: +(all.bytes / all.verts).toFixed(1),
-    floatLayoutMB: mb(all.verts * 32 + all.quads * 6 * 4), // float32 pos+uv+colour, 32-bit indices
-  },
-  ringResident: {
-    renderDist: RENDER_DIST,
-    sections: resident.sections,
-    meshes: resident.meshes,
-    quads: resident.quads,
-    packedMB: mb(resident.bytes),
-    meshMs: +resident.ms.toFixed(0),
-  },
-};
-console.log(JSON.stringify(out, null, 2));
+const fmt = (r) => ({ sections: r.sections, meshes: r.meshes, quads: r.quads, packedMB: mb(r.bytes), meshMs: +r.ms.toFixed(0) });
+console.log(
+  JSON.stringify(
+    {
+      world: kind,
+      size: `${SIZE}x${SIZE}`,
+      info,
+      genMs: +genMs.toFixed(0),
+      filledSections: sections.length,
+      voxelDataMB: mb(sections.length * SECTION_VOLUME),
+      meshEverything: {
+        sections: all.sections,
+        meshes: all.meshes,
+        totalMs: +all.ms.toFixed(0),
+        avgMsPerSection: +(all.ms / all.sections).toFixed(3),
+        worstSectionMs: +all.worst.toFixed(2),
+        quads: all.quads,
+        packedMB: mb(all.bytes),
+        bytesPerVertex: +(all.bytes / all.verts).toFixed(1),
+      },
+      ringAtSpawn: { renderDist: RENDER_DIST, ...fmt(spawnRing) },
+      ringDowntown: { renderDist: RENDER_DIST, ...fmt(downtownRing) },
+    },
+    null,
+    2,
+  ),
+);

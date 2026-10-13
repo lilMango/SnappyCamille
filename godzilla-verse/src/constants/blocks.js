@@ -21,6 +21,15 @@ export const B = {
   STEEL: 14,
   RUBBLE: 15,
   FENCE: 16, // cutout: alpha-tested see-through lattice
+  ASPHALT_LINE_X: 17, // lane line along x (east-west streets)
+  CROSSWALK_Z: 18, // zebra bars running along z (crossing an avenue)
+  CROSSWALK_X: 19, // zebra bars running along x (crossing a street)
+  LOG: 20,
+  LEAVES: 21, // cutout
+  NEON_PINK: 22, // emissive
+  NEON_CYAN: 23, // emissive
+  PLANKS: 24,
+  POOL: 25, // decorative water (opaque, solid): fountain basins
 };
 
 // Face order everywhere in the engine: +x, -x, +y, -y, +z, -z.
@@ -46,10 +55,19 @@ const DEFS = [
   { id: B.BRICK, name: 'brick', tiles: 'brick' },
   // Glass is opaque for culling/sorting purposes: the whole city stays one opaque pass.
   { id: B.GLASS, name: 'glass', tiles: 'glass' },
-  { id: B.GLASS_LIT, name: 'glass_lit', tiles: 'glass_lit' },
+  { id: B.GLASS_LIT, name: 'glass_lit', tiles: 'glass_lit', emit: true },
   { id: B.STEEL, name: 'steel', tiles: 'steel' },
   { id: B.RUBBLE, name: 'rubble', tiles: 'rubble' },
   { id: B.FENCE, name: 'fence', tiles: 'fence', cutout: true },
+  { id: B.ASPHALT_LINE_X, name: 'asphalt_line_x', tiles: ['asphalt_line_h', 'concrete_dark', 'concrete_dark'] },
+  { id: B.CROSSWALK_Z, name: 'crosswalk_z', tiles: ['crosswalk_v', 'concrete_dark', 'concrete_dark'] },
+  { id: B.CROSSWALK_X, name: 'crosswalk_x', tiles: ['crosswalk_h', 'concrete_dark', 'concrete_dark'] },
+  { id: B.LOG, name: 'log', tiles: ['log_top', 'log_side', 'log_top'] },
+  { id: B.LEAVES, name: 'leaves', tiles: 'leaves', cutout: true },
+  { id: B.NEON_PINK, name: 'neon_pink', tiles: 'neon_pink', emit: true },
+  { id: B.NEON_CYAN, name: 'neon_cyan', tiles: 'neon_cyan', emit: true },
+  { id: B.PLANKS, name: 'planks', tiles: 'planks' },
+  { id: B.POOL, name: 'pool', tiles: 'water' },
 ];
 
 function expandTiles(t) {
@@ -63,6 +81,7 @@ export const BLOCK_DEFS = [];
 export const SOLID = new Uint8Array(256); // blocks collision / is meshed
 export const OPAQUE = new Uint8Array(256); // hides the faces of neighbours behind it
 export const CUTOUT = new Uint8Array(256); // meshed in the alpha-tested pass, hides nothing
+export const EMIT = new Uint8Array(256); // self-lit: ignores the world tint, shading and AO (lit windows, neon)
 // Per block, per face: [u0, v0, u1, v1] as normalised Uint16 (0..65535).
 export const BLOCK_UV = new Uint16Array(256 * 6 * 4);
 
@@ -72,6 +91,7 @@ for (const d of DEFS) {
   SOLID[d.id] = 1;
   OPAQUE[d.id] = d.cutout ? 0 : 1;
   CUTOUT[d.id] = d.cutout ? 1 : 0;
+  EMIT[d.id] = d.emit ? 1 : 0;
   for (let f = 0; f < 6; f++) {
     const uv = tileUV(TILE_INDEX[tiles[f]]);
     const o = (d.id * 6 + f) * 4;
@@ -113,6 +133,15 @@ const COLORS = {
   steel: 0x7b8794,
   rubble: 0x77736c,
   fence: 0x4a5260,
+  asphalt_line_x: 0x2f3033,
+  crosswalk_z: 0xcfcdc4,
+  crosswalk_x: 0xcfcdc4,
+  log: 0x5b4128,
+  leaves: 0x3f8a34,
+  neon_pink: 0xff3fa4,
+  neon_cyan: 0x2fe6ff,
+  planks: 0x9a7446,
+  pool: 0x2f6fb0,
 };
 export const BLOCK_COLOR = new Uint32Array(256);
 for (const d of DEFS) BLOCK_COLOR[d.id] = COLORS[d.name] ?? 0xff00ff;

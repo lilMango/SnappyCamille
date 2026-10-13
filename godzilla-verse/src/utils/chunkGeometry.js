@@ -9,13 +9,15 @@ SECTION_BOX.getBoundingSphere(SECTION_SPHERE);
 
 /**
  * Mesher output (packed typed arrays) -> BufferGeometry, uploaded as-is:
- *   position Uint8 (not normalised), uv Uint16 (normalised), color Uint8 (normalised).
+ *   position Uint8 (not normalised), uv Uint16 (normalised), color Uint8 (normalised),
+ *   aEmit Uint8 (normalised).
  */
 export function buildChunkGeometry(r) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(r.position, 3, false));
   g.setAttribute('uv', new THREE.BufferAttribute(r.uv, 2, true));
   g.setAttribute('color', new THREE.BufferAttribute(r.color, 3, true));
+  g.setAttribute('aEmit', new THREE.BufferAttribute(r.emit, 1, true));
   g.setIndex(new THREE.BufferAttribute(r.index, 1));
   g.boundingBox = SECTION_BOX.clone();
   g.boundingSphere = SECTION_SPHERE.clone();

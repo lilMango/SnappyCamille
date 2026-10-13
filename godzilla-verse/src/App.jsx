@@ -12,24 +12,30 @@ import GlErrorBoundary from './components/GlErrorBoundary';
 import Hotbar from './components/Hotbar';
 import InputController from './components/InputController';
 import Lighting from './components/Lighting';
+import LoadingScreen from './components/LoadingScreen';
 import MobileControls from './components/MobileControls';
 import Player from './components/Player';
 import ProbeHud from './components/ProbeHud';
+import Sky from './components/Sky';
 import Sparks from './components/Sparks';
+import Surroundings from './components/Surroundings';
 import StatsProbe from './components/StatsProbe';
-import { useGame, player, camState, target, stats } from './store';
+import { useGame, player, camState, target, stats, city } from './store';
 import { input } from './utils/input';
 import { IS_TOUCH, SHOW_DEBUG } from './utils/worldSelect';
 import { world } from './utils/voxelWorld';
-import { FOG_FAR, FOG_NEAR } from './constants/worldConfig';
+import { SKY_PRESETS } from './constants/skyConfig';
+import { worldTint } from './utils/chunkMaterial';
+import { TIME_OF_DAY } from './utils/worldSelect';
 import { TILES, ATLAS_SIZE } from './utils/atlas';
 
-// Daytime placeholder for the test world; the city (phase 4) goes dusk/night.
-const SKY = '#9ccaf0';
+// Time of day: sky, fog, background, world tint and lights all come from one preset.
+const PRESET = SKY_PRESETS[TIME_OF_DAY];
+worldTint.value.set(PRESET.tint); // before any chunk material compiles
 
 // Dev/test hook (like the sibling projects' window.__player): lets automated checks drive
 // the game and read its state.
-if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame };
+if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame, city };
 
 // Phase 0 probe: a module worker created the same way the real mesh/city workers
 // will be. If this reports OK on the deployed host, `base` + workers are proven.
@@ -81,8 +87,8 @@ export default function App() {
             gl.toneMappingExposure = 0.95;
           }}
         >
-          <color attach="background" args={[SKY]} />
-          <fog attach="fog" args={[SKY, FOG_NEAR, FOG_FAR]} />
+          <color attach="background" args={[PRESET.fog]} />
+          <fog attach="fog" args={[PRESET.fog, PRESET.fogNear, PRESET.fogFar]} />
           <PerspectiveCamera makeDefault fov={70} near={0.1} far={400} />
           <AdaptiveDpr pixelated />
           <Lighting />
@@ -92,6 +98,8 @@ export default function App() {
           <BlockInteraction />
           <Sparks />
           {freeCam ? <FlyCamera /> : <CameraRig />}
+          <Sky />
+          <Surroundings />
           <Suspense fallback={null}>
             <ChunkRenderer />
           </Suspense>
@@ -99,6 +107,7 @@ export default function App() {
         </Canvas>
         <Loader />
       </GlErrorBoundary>
+      <LoadingScreen />
       <Crosshair />
       <Hotbar />
       {IS_TOUCH && <MobileControls />}

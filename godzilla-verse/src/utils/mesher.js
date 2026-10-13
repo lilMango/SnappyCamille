@@ -1,5 +1,5 @@
 import { CHUNK_X, CHUNK_Z, SECTION_H, PAD_X, PAD_Z } from '../constants/worldConfig';
-import { OPAQUE, CUTOUT, BLOCK_UV, SHADE_AO } from '../constants/blocks';
+import { OPAQUE, CUTOUT, EMIT, BLOCK_UV, SHADE_AO } from '../constants/blocks';
 import { padIndex } from './blockIndex';
 
 /**
@@ -16,7 +16,8 @@ import { padIndex } from './blockIndex';
  * renderer uploads as-is, ~10 B/vertex:
  *   position  Uint8  x3   section-local coordinates (0..16 on x/z, 0..32 on y)
  *   uv        Uint16 x2   normalised atlas UVs
- *   color     Uint8  x3   baked face brightness x ambient occlusion
+ *   color     Uint8  x3   baked face brightness x ambient occlusion (255 for self-lit blocks)
+ *   emit      Uint8  x1   255 = self-lit (lit windows, neon): ignores the world tint
  *   index     Uint16 | Uint32 (Uint32 only when a part exceeds 65 535 vertices)
  */
 
@@ -34,6 +35,7 @@ class Builder {
     this.pos = new Uint8Array(quads * 12);
     this.uv = new Uint16Array(quads * 8);
     this.col = new Uint8Array(quads * 12);
+    this.emit = new Uint8Array(quads * 4);
     this.idx = new Uint32Array(quads * 6);
   }
 
@@ -46,11 +48,12 @@ class Builder {
   // steady state is allocation-free.
   reserve() {
     if (this.vc / 4 < this.cap) return;
-    const { pos, uv, col, idx } = this;
+    const { pos, uv, col, emit, idx } = this;
     this.alloc(this.cap * 2);
     this.pos.set(pos);
     this.uv.set(uv);
     this.col.set(col);
+    this.emit.set(emit);
     this.idx.set(idx);
   }
 
@@ -61,6 +64,7 @@ class Builder {
       position: this.pos.slice(0, vc * 3),
       uv: this.uv.slice(0, vc * 2),
       color: this.col.slice(0, vc * 3),
+      emit: this.emit.slice(0, vc),
       index: vc > 65535 ? this.idx.slice(0, ic) : Uint16Array.from(this.idx.subarray(0, ic)),
       vertexCount: vc,
       quadCount: vc / 4,
@@ -134,7 +138,7 @@ function emitQuad(out, pad, f, id, x, y, z, pi) {
   }
 
   const vc = out.vc;
-  const cf = f * 12;
+  const lit = EMIT[id];
   const uvo = (id * 6 + f) * 4;
   const u0 = BLOCK_UV[uvo];
   const v0 = BLOCK_UV[uvo + 1];
@@ -146,7 +150,8 @@ function emitQuad(out, pad, f, id, x, y, z, pi) {
     out.pos[v] = x + CORNERS[f][k * 3];
     out.pos[v + 1] = y + CORNERS[f][k * 3 + 1];
     out.pos[v + 2] = z + CORNERS[f][k * 3 + 2];
-    const shade = SHADE_AO[f * 4 + _ao[k]];
+    const shade = lit ? 255 : SHADE_AO[f * 4 + _ao[k]];
+    out.emit[vc + k] = lit ? 255 : 0;
     out.col[v] = shade;
     out.col[v + 1] = shade;
     out.col[v + 2] = shade;

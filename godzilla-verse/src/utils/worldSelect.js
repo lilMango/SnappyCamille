@@ -1,23 +1,32 @@
 // Which world the URL selects, plus its spawn point and free-camera start. One place, so
 // the renderer, the player and the fly camera can't disagree.
 //
-//   ?world=city   the 384x384 synthetic city (phase-2 perf gate world)
+//   (default)        the real city (phase 4): generated in a worker, dusk
+//   ?world=test      the 64x64 engine test world (daytime)
+//   ?world=synthetic the 384x384 box-tower world used as the phase-2 perf gate
+//   ?time=day|dusk|night   time of day (dusk for the city, day for the others)
 //   ?cam=x,y,z,yawDeg,pitchDeg   start in the free camera at that pose (also: ?free=1)
-//   ?workers=0    mesh on the main thread      ?rd=N   render distance in chunks
-//
-// (Default is the 64x64 test world with the player on the road.)
+//   ?workers=0    mesh and generate on the main thread      ?rd=N   render distance in chunks
+
+import { CITY_SPAWN } from '../constants/cityConfig';
 
 const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
 
-export const WORLD_KIND = params.get('world') === 'city' ? 'city' : 'test';
+const w = params.get('world');
+export const WORLD_KIND = w === 'test' ? 'test' : w === 'synthetic' ? 'synthetic' : 'city';
 export const USE_WORKERS = params.get('workers') !== '0';
 export const RENDER_DIST_OVERRIDE = Number(params.get('rd')) || undefined;
 
 // feet position, and the yaw the player starts facing (radians; 0 looks toward -z)
 export const SPAWN =
   WORLD_KIND === 'city'
-    ? { x: 196.5, y: 21.01, z: 196.5, yaw: 0 } // avenue/street crossing mid-city
-    : { x: 31.5, y: 21.01, z: 46.5, yaw: 0 }; // on the road, south of the junction
+    ? CITY_SPAWN // the park path, facing the fountain
+    : WORLD_KIND === 'synthetic'
+      ? { x: 196.5, y: 21.01, z: 196.5, yaw: 0 } // avenue/street crossing mid-city
+      : { x: 31.5, y: 21.01, z: 46.5, yaw: 0 }; // test world: on the road, south of the junction
+
+const t = params.get('time');
+export const TIME_OF_DAY = t === 'day' || t === 'dusk' || t === 'night' ? t : WORLD_KIND === 'city' ? 'dusk' : 'day';
 
 const cam = (params.get('cam') || '').split(',').map(Number);
 export const FREE_CAM_START =

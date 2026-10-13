@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { easing } from 'maath';
 import PlayerMesh from './PlayerMesh';
-import { player, useGame, stats } from '../store';
+import { player, city, useGame, stats } from '../store';
 import { world } from '../utils/voxelWorld';
 import { moveBody } from '../utils/physics';
 import { createHit, raycastVoxel } from '../utils/raycast';
@@ -41,7 +41,7 @@ export default function Player() {
     const g = useGame.getState();
     const b = player.body;
 
-    if (!g.freeCam) {
+    if (!g.freeCam && city.generated) {
       // ---- wanted velocity, relative to where the camera looks ----
       moveIntent(_intent);
       const sin = Math.sin(input.yaw);
