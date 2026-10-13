@@ -24,6 +24,9 @@ export const ODM = {
   range: 90, // metres
   assistDeg: 7, // aim-assist cone half-angle for the crosshair ray
   snapDeg: 25, // if the ray finds nothing, snap to a roof corner inside this cone
+  aimLiftDeg: 12, // every hook is aimed this much above the crosshair, so it bites higher and the rope lifts you
+  highSnapDeg: 32, // first choice: a roof corner well above you inside this cone (around the lifted aim)
+  highSnapRise: 8, // ...at least this much higher than your feet
   snapMin: 12,
   snapMax: 85,
   chestHeight: 1.0, // the rope attaches here, above the feet

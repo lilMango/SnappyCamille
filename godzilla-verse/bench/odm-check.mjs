@@ -117,8 +117,12 @@ await hold('KeyE');
 const attached = await waitFor(() => window.__gv.odm.anchors[1].active, null, 30000);
 const s1 = await state();
 check('E fires the right hook and it sticks', !!attached);
-const near = plan && attached ? Math.hypot(s1.ax - Math.max(plan.b.x0, Math.min(s1.ax, plan.b.x1 + 1)), s1.az - Math.max(plan.b.z0, Math.min(s1.az, plan.b.z1 + 1))) : 99;
-check('...onto the building (within a block of its footprint)', near < 1.6 && s1.ay > 30, `anchor ${s1.ax?.toFixed(1)},${s1.ay?.toFixed(1)},${s1.az?.toFixed(1)}`);
+// hooks are aimed above the crosshair and prefer high roof corners, so it may land on a neighbouring tower: it must be high and on a solid block
+const solidAnchor = await gv(() => {
+  const a = window.__gv.odm.anchors[1];
+  return window.__gv.world.isSolid(a.bx, a.by, a.bz);
+});
+check('...high up (>30) on a solid block', s1.ay > 30 && solidAnchor, `anchor ${s1.ax?.toFixed(1)},${s1.ay?.toFixed(1)},${s1.az?.toFixed(1)}`);
 check('...and it costs gas', s1.gas < s0.gas - 5, `${s0.gas.toFixed(0)} -> ${s1.gas.toFixed(0)}`);
 await page.screenshot({ path: `${outDir}/1_hooked.png` });
 

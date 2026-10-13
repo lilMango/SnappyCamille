@@ -461,3 +461,40 @@ describe('unlimited gas (the default)', () => {
     }
   });
 });
+
+describe('aiming higher', () => {
+  // a tall wall 30 blocks away; the player fires dead level from the ground
+  const levelShot = (anchors) => {
+    const w = new VoxelWorld();
+    w.fillBox(-40, 0, 20, 40, 120, 20, B.CONCRETE);
+    const odm = createOdm();
+    const b = player(0.5, 30, 50.5);
+    const io = NO_INPUT();
+    io.hook = [false, true];
+    io.ray = { ox: 0.5, oy: 31.6, oz: 50.5, dx: 0, dy: 0, dz: -1 };
+    io.anchors = anchors;
+    frame(w, odm, b, io);
+    return odm.anchors[1];
+  };
+
+  test('a level shot at a wall bites higher than the crosshair (so the rope lifts you)', () => {
+    const a = levelShot(null);
+    expect(a.active).toBe(true);
+    expect(a.y).toBeGreaterThan(31.6 + 4); // 30 blocks out at 12 degrees is ~6 up
+  });
+
+  test('a roof corner well above you is preferred when it is inside the cone', () => {
+    const w = new VoxelWorld();
+    w.fillBox(-40, 0, 20, 40, 40, 20, B.CONCRETE); // wall to y 40
+    w.fillBox(2, 41, 15, 8, 58, 20, B.CONCRETE); // a tower on top; its corner at (2, 58, 15)
+    const odm = createOdm();
+    const b = player(0.5, 30, 50.5);
+    const io = NO_INPUT();
+    io.hook = [false, true];
+    io.ray = { ox: 0.5, oy: 31.6, oz: 50.5, dx: 0, dy: 0, dz: -1 };
+    io.anchors = Int16Array.from([2, 58, 15]);
+    frame(w, odm, b, io);
+    expect(odm.anchors[1].active).toBe(true);
+    expect(odm.anchors[1].y).toBeGreaterThan(55);
+  });
+});

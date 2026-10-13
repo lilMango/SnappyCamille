@@ -117,13 +117,15 @@ function fill(out, h) {
  * the aim direction. `anchors` is the city's Int16Array of (x, y, z) triples. Prefers corners
  * that are higher than the player, which swing best.
  */
-export function snapAnchor(world, anchors, ox, oy, oz, dx, dy, dz, py, out) {
+export function snapAnchor(world, anchors, ox, oy, oz, dx, dy, dz, py, out, opts) {
+  const coneDeg = opts ? opts.coneDeg : ODM.snapDeg;
+  const minRise = opts ? opts.minRise : -Infinity;
   if (!anchors) return false;
   const len = Math.hypot(dx, dy, dz);
   dx /= len;
   dy /= len;
   dz /= len;
-  const cosMax = Math.cos((ODM.snapDeg * Math.PI) / 180);
+  const cosMax = Math.cos((coneDeg * Math.PI) / 180);
   let best = -1;
   let bestScore = Infinity;
   for (let i = 0; i < anchors.length; i += 3) {
@@ -135,6 +137,7 @@ export function snapAnchor(world, anchors, ox, oy, oz, dx, dy, dz, py, out) {
     const rz = az - oz;
     const d = Math.hypot(rx, ry, rz);
     if (d < ODM.snapMin || d > ODM.snapMax) continue;
+    if (ay - py < minRise) continue;
     const cos = (rx * dx + ry * dy + rz * dz) / d;
     if (cos < cosMax) continue;
     const angle = (Math.acos(Math.min(1, cos)) * 180) / Math.PI;
@@ -198,6 +201,34 @@ export function odmConstraint(odm, b) {
   }
 }
 
+const _aim = { x: 0, y: 1, z: 0 };
+
+/** The ray's direction rotated `deg` degrees toward straight up (about the horizontal axis it is perpendicular to). */
+function tiltUp(r, deg, out) {
+  const t = (deg * Math.PI) / 180;
+  // component of "up" perpendicular to the ray
+  const k = r.dy;
+  let ux = -k * r.dx;
+  let uy = 1 - k * r.dy;
+  let uz = -k * r.dz;
+  const ul = Math.hypot(ux, uy, uz);
+  if (ul < 1e-6) {
+    out.x = r.dx;
+    out.y = r.dy;
+    out.z = r.dz;
+    return out;
+  }
+  ux /= ul;
+  uy /= ul;
+  uz /= ul;
+  const c = Math.cos(t);
+  const sn = Math.sin(t);
+  out.x = r.dx * c + ux * sn;
+  out.y = r.dy * c + uy * sn;
+  out.z = r.dz * c + uz * sn;
+  return out;
+}
+
 // ---- per frame ---------------------------------------------------------------------------
 
 function spend(odm, amount) {
@@ -253,7 +284,11 @@ export function odmUpdate(world, odm, b, io, dt) {
       // pressed this frame
       if (odm.gas >= ODM.shotCost && !a.active) {
         const r = io.ray;
-        let got = findAnchor(world, r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, a);
+        // aim higher than the crosshair: a rope from above lifts you, one from chest height just drags you sideways
+        tiltUp(r, ODM.aimLiftDeg, _aim);
+        let got = snapAnchor(world, io.anchors, r.ox, r.oy, r.oz, _aim.x, _aim.y, _aim.z, b.y, a, { coneDeg: ODM.highSnapDeg, minRise: ODM.highSnapRise });
+        if (!got) got = findAnchor(world, r.ox, r.oy, r.oz, _aim.x, _aim.y, _aim.z, a);
+        if (!got) got = findAnchor(world, r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, a);
         if (!got) got = snapAnchor(world, io.anchors, r.ox, r.oy, r.oz, r.dx, r.dy, r.dz, b.y, a);
         if (got) {
           a.active = true;
