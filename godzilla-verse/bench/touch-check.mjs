@@ -78,8 +78,8 @@ check(
 
 // ---- look pad: drag in the right half rotates the view ----
 const yaw0 = (await read()).yaw;
-await touch('touchStart', [[600, 200]]);
-for (let i = 1; i <= 5; i++) await touch('touchMove', [[600 + i * 20, 200 - i * 6]]);
+await touch('touchStart', [[520, 90]]);
+for (let i = 1; i <= 5; i++) await touch('touchMove', [[520 + i * 20, 90 + i * 2]]);
 await touch('touchEnd', []);
 await waitFor(() => true);
 await sleep(500);
@@ -111,6 +111,15 @@ check('PLACE button holds the place flag', await eventually(() => window.__gv.in
 await touch('touchEnd', []);
 check('both release cleanly', await eventually(() => !window.__gv.input.breakHeld && !window.__gv.input.placeHeld));
 
+// ODM gear buttons (hold = hook out / reeling)
+for (const [label, flag] of [['L HOOK', 'touchHookL'], ['R HOOK', 'touchHookR'], ['REEL', 'touchReel']]) {
+  [bx, by] = await btnCenter(label);
+  await touch('touchStart', [[bx, by]]);
+  check(`${label} button holds its flag`, await eventually((f) => window.__gv.input[f] === true, flag));
+  await touch('touchEnd', []);
+  check(`...and releases it`, await eventually((f) => window.__gv.input[f] === false, flag));
+}
+
 const mode0 = (await read()).mode;
 [bx, by] = await btnCenter('CAM');
 await touch('touchStart', [[bx, by]]);
@@ -119,8 +128,8 @@ check('CAM button cycles the camera mode', await eventually((m0) => window.__gv.
 
 // ---- two fingers at once: walk while looking ----
 const yaw1 = (await read()).yaw;
-await touch('touchStart', [[150, 300], [600, 200]]);
-await touch('touchMove', [[150, 260], [680, 200]]);
+await touch('touchStart', [[150, 300], [520, 90]]);
+await touch('touchMove', [[150, 260], [600, 90]]);
 check(
   'joystick and look pad work at the same time',
   await eventually((y1) => window.__gv.input.touchMz > 0.5 && window.__gv.input.yaw !== y1, yaw1),

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { createBody } from './utils/physics';
+import { createOdm, odmConstraint } from './utils/odm';
+import { ODM } from './constants/odmConfig';
 import { PLAYER, CAMERA_MODES, HOTBAR } from './constants/playerConfig';
 import { SPAWN, START_FREE } from './utils/worldSelect';
 
@@ -25,7 +27,16 @@ export const player = {
   eyeX: SPAWN.x,
   eyeY: SPAWN.y + PLAYER.eyeHeight,
   eyeZ: SPAWN.z,
+  health: ODM.maxHealth,
+  score: 0, // swing distance / 4 + bonuses (later phases add kaiju damage)
+  bonus: 0,
+  invulnerable: 0, // seconds of damage immunity (after a respawn)
+  lean: 0, // body pitch while swinging, for the mesh
 };
+
+// ODM gear: ropes, gas, boost. The rope runs inside the physics substeps via body.constraint.
+export const odm = createOdm();
+player.body.constraint = (b) => odmConstraint(odm, b);
 
 // The city: loading state while it generates, then its lot map / buildings / anchors.
 //   state: idle | loading | generated | error     generated: voxel data is in (physics can run)
@@ -78,6 +89,11 @@ export const stats = {
   locked: false, // pointer locked
   grounded: false,
   hSpeed: 0, // player horizontal speed
+  gas: 100,
+  health: 100,
+  score: 0,
+  fov: 70,
+  trauma: 0,
   target: '', // block under the crosshair
   speed: 0, // free-cam fly speed (m/s)
   x: 0, // camera position

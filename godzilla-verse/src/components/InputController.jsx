@@ -12,7 +12,8 @@ import { START_WIREFRAME } from '../utils/worldSelect';
  * yaw/pitch are up to date before the player, camera and interaction read them.
  *
  *   click canvas: capture mouse      Esc: release
- *   WASD / arrows move · Shift sprint · Space jump
+ *   WASD / arrows move · Shift sprint · Space jump (boost while roped)
+ *   Q / E hold the left / right hook · Ctrl or R reel · F air dash
  *   LMB break · RMB place · 1-9 or wheel: hotbar
  *   F5 camera (third / first / front) · V free camera · G wireframe
  */
@@ -23,6 +24,7 @@ export default function InputController() {
   const onLook = useCallback((dx, dy) => {
     input.lookDX += dx;
     input.lookDY += dy;
+    input.lastLookT = performance.now() / 1000;
   }, []);
   usePointerLock(gl.domElement, onLook);
 
@@ -42,6 +44,7 @@ export default function InputController() {
       if (e.repeat) return;
       if (e.code === 'KeyV') useGame.getState().toggleFreeCam();
       else if (e.code === 'KeyG') setChunkWireframe(!chunkWireframe());
+      else if (e.code === 'KeyF') input.dashPressed = true;
       else if (e.code.startsWith('Digit')) {
         const n = Number(e.code.slice(5));
         if (n >= 1 && n <= 9) useGame.getState().selectHotbar(n - 1);

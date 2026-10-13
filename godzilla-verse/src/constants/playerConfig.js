@@ -11,7 +11,9 @@ export const PLAYER = {
   walkSpeed: 6,
   sprintSpeed: 10,
   groundAccel: 0.06, // smooth-time (s) toward the wanted velocity on the ground
-  airAccel: 0.35, // ...and in the air: much floatier control
+  airAccel: 0.35, // (unused now: airborne control is acceleration-limited, see airControl)
+  airControl: 25, // m/s^2 you can steer in the air, up to your walk/sprint speed along the wish direction
+  swingControl: 0.35, // ...and this fraction of it while roped, so steering doesn't fight the pendulum
   gravity: 28,
   terminalVelocity: 60,
   jumpSpeed: 8.6, // apex ~1.3 blocks: clears a 1-block ledge with room to spare

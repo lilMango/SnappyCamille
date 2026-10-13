@@ -25,6 +25,8 @@ export default function DebugPanel() {
     ['mesh mgr ms/frame', s.meshMs.toFixed(2)],
     ['camera pos', `${s.x.toFixed(0)}, ${s.y.toFixed(0)}, ${s.z.toFixed(0)}`],
     ['player', `${s.grounded ? 'grounded' : 'airborne'} · ${s.hSpeed.toFixed(1)} m/s`],
+    ['gas / health', `${s.gas.toFixed(0)} / ${s.health.toFixed(0)}`],
+    ['fov / shake', `${s.fov.toFixed(0)}° / ${s.trauma.toFixed(2)}`],
     ['target', s.target || '—'],
   ];
 
@@ -39,7 +41,7 @@ export default function DebugPanel() {
       ))}
       <div style={styles.hint}>
         {s.locked
-          ? 'WASD · Shift sprint · Space jump · LMB break · RMB place · 1-9/wheel hotbar · F5 camera · V free-cam · G wireframe · Esc release'
+          ? 'WASD · Shift sprint · Space jump/boost · Q/E hooks · Ctrl|R reel · F dash · LMB break · RMB place · 1-9 hotbar · F5 camera · V free-cam · Esc release'
           : 'Click the scene to capture the mouse'}
       </div>
     </div>

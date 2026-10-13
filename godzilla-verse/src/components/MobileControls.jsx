@@ -60,6 +60,7 @@ export default function MobileControls() {
   const lookMove = (e) => {
     for (const t of e.changedTouches) {
       if (t.identifier !== look.current.id) continue;
+      input.lastLookT = performance.now() / 1000;
       input.lookDX += (t.clientX - look.current.x) * LOOK_SCALE;
       input.lookDY += (t.clientY - look.current.y) * LOOK_SCALE;
       look.current.x = t.clientX;
@@ -102,9 +103,29 @@ export default function MobileControls() {
       <button type="button" style={{ ...styles.btn, right: 112, bottom: 150, ...styles.small }} {...hold('placeHeld')}>
         PLACE
       </button>
+      {/* ODM gear: hold a hook button to fire and stay attached; release to let go */}
+      <button type="button" style={{ ...styles.btn, right: 196, bottom: 150, ...styles.mid }} {...hold('touchHookL')}>
+        L HOOK
+      </button>
+      <button type="button" style={{ ...styles.btn, right: 196, bottom: 78, ...styles.mid }} {...hold('touchHookR')}>
+        R HOOK
+      </button>
+      <button type="button" style={{ ...styles.btn, right: 268, bottom: 114, ...styles.mid }} {...hold('touchReel')}>
+        REEL
+      </button>
       <button
         type="button"
-        style={{ ...styles.btn, right: 22, top: 'calc(env(safe-area-inset-top, 0px) + 150px)', ...styles.tiny }}
+        style={{ ...styles.btn, right: 22, bottom: 196, ...styles.mid }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          input.dashPressed = true;
+        }}
+      >
+        DASH
+      </button>
+      <button
+        type="button"
+        style={{ ...styles.btn, right: 12, top: 'calc(env(safe-area-inset-top, 0px) + 12px)', ...styles.tiny }}
         onTouchStart={(e) => {
           e.stopPropagation();
           useGame.getState().cycleCamera();
@@ -157,5 +178,6 @@ const styles = {
   },
   btn,
   small: { width: 62, height: 62 },
+  mid: { width: 56, height: 56, font: '700 10px/1 ui-monospace, monospace' },
   tiny: { width: 46, height: 46, font: '700 10px/1 ui-monospace, monospace' },
 };

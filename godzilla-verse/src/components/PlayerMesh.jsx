@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { toonGradient, addOutlines } from '../utils/toon';
-import { player } from '../store';
+import { player, odm } from '../store';
 
 // Blocky Survey-Corps-style character built from boxes, same rig pattern as the sibling
 // projects' creatures: pivot groups at the joints, driven each frame from a mutable object
@@ -61,6 +61,16 @@ const PlayerMesh = forwardRef(function PlayerMesh(_props, ref) {
       armL.current.rotation.x = -0.6 - air * 0.3;
       armR.current.rotation.x = -0.6 - air * 0.3;
       body.current.position.y = 0;
+    }
+
+    // roped: the arm on that side reaches up and forward toward the anchor, legs trail behind
+    const l = odm.anchors[0].active;
+    const rr = odm.anchors[1].active;
+    if (l) armL.current.rotation.x = -2.6;
+    if (rr) armR.current.rotation.x = -2.6;
+    if ((l || rr) && !player.body.grounded) {
+      legL.current.rotation.x = 0.55;
+      legR.current.rotation.x = 0.25;
     }
   });
 

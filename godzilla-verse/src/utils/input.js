@@ -12,6 +12,11 @@ export const input = {
   touchMz: 0,
   touchSprint: false,
   touchJump: false,
+  touchHookL: false,
+  touchHookR: false,
+  touchReel: false,
+  dashPressed: false, // edge: set on key/touch press, consumed by the player controller
+  lastLookT: 0, // when the user last moved the view (seconds), so the camera can auto-follow when idle
   breakHeld: false,
   placeHeld: false,
   // raw look deltas (pixels-equivalent) accumulated since the last frame
@@ -43,6 +48,9 @@ export function moveIntent(out) {
 
 export const isSprinting = () => input.keys.has('ShiftLeft') || input.keys.has('ShiftRight') || input.touchSprint;
 export const isJumping = () => input.keys.has('Space') || input.touchJump;
+// ODM gear: Q / E hold the left / right hook, Ctrl or R reels in, F dashes (Space boosts while roped)
+export const hookHeld = (i) => (i === 0 ? input.keys.has('KeyQ') || input.touchHookL : input.keys.has('KeyE') || input.touchHookR);
+export const isReeling = () => input.keys.has('ControlLeft') || input.keys.has('ControlRight') || input.keys.has('KeyR') || input.touchReel;
 
 /** Drop every held input (window blur, pointer-lock loss, mode switches). */
 export function releaseAll() {
@@ -53,4 +61,8 @@ export function releaseAll() {
   input.touchMz = 0;
   input.touchSprint = false;
   input.touchJump = false;
+  input.touchHookL = false;
+  input.touchHookR = false;
+  input.touchReel = false;
+  input.dashPressed = false;
 }

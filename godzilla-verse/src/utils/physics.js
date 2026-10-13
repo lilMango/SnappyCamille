@@ -9,6 +9,8 @@
  *          vx, vy, vz
  *          hw, h     half width (x/z) and height
  *          stepHeight, gravity, terminal
+ *          gravityScale   multiplies gravity (0 = a brief zero-g window); default 1
+ *          constraint     optional fn(body) run after every substep (the ODM rope)
  *          grounded, hitWall, hitCeiling }  (the last three are outputs)
  */
 
@@ -22,6 +24,8 @@ export function createBody({ x = 0, y = 0, z = 0, halfWidth = 0.3, height = 1.8,
     vx: 0, vy: 0, vz: 0,
     hw: halfWidth, h: height,
     stepHeight, gravity, terminal,
+    gravityScale: 1,
+    constraint: null,
     grounded: false, hitWall: false, hitCeiling: false,
   };
 }
@@ -110,7 +114,7 @@ export function moveBody(world, b, dt) {
 
 function step(world, b, dt) {
   // ---- vertical ----
-  b.vy = Math.max(-b.terminal, b.vy - b.gravity * dt);
+  b.vy = Math.max(-b.terminal, b.vy - b.gravity * b.gravityScale * dt);
   const dy = b.vy * dt;
   const ay = sweep(world, b, 1, dy);
   b.y += ay;
@@ -149,6 +153,9 @@ function step(world, b, dt) {
       b.hitWall = false;
     }
   }
+
+  // ---- external constraint (the ODM rope), applied every substep so it stays stable at speed ----
+  if (b.constraint) b.constraint(b);
 }
 
 // Re-do the horizontal move from (x0, z0) after rising by up to stepHeight. Accepted only

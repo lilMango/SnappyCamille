@@ -10,17 +10,19 @@ import DebugPanel from './components/DebugPanel';
 import FlyCamera from './components/FlyCamera';
 import GlErrorBoundary from './components/GlErrorBoundary';
 import Hotbar from './components/Hotbar';
+import Hud from './components/Hud';
 import InputController from './components/InputController';
 import Lighting from './components/Lighting';
 import LoadingScreen from './components/LoadingScreen';
 import MobileControls from './components/MobileControls';
 import Player from './components/Player';
+import Ropes from './components/Ropes';
 import ProbeHud from './components/ProbeHud';
 import Sky from './components/Sky';
 import Sparks from './components/Sparks';
 import Surroundings from './components/Surroundings';
 import StatsProbe from './components/StatsProbe';
-import { useGame, player, camState, target, stats, city } from './store';
+import { useGame, player, camState, target, stats, city, odm } from './store';
 import { input } from './utils/input';
 import { IS_TOUCH, SHOW_DEBUG } from './utils/worldSelect';
 import { world } from './utils/voxelWorld';
@@ -35,7 +37,7 @@ worldTint.value.set(PRESET.tint); // before any chunk material compiles
 
 // Dev/test hook (like the sibling projects' window.__player): lets automated checks drive
 // the game and read its state.
-if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame, city };
+if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame, city, odm };
 
 // Phase 0 probe: a module worker created the same way the real mesh/city workers
 // will be. If this reports OK on the deployed host, `base` + workers are proven.
@@ -96,6 +98,7 @@ export default function App() {
           <InputController />
           <Player />
           <BlockInteraction />
+          <Ropes />
           <Sparks />
           {freeCam ? <FlyCamera /> : <CameraRig />}
           <Sky />
@@ -108,6 +111,7 @@ export default function App() {
         <Loader />
       </GlErrorBoundary>
       <LoadingScreen />
+      <Hud />
       <Crosshair />
       <Hotbar />
       {IS_TOUCH && <MobileControls />}

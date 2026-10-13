@@ -51,8 +51,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | 2 Worker meshing + AO + cutout pass + budgets (+ perf gate) | **done** |
 | 3 Player + physics + camera shell + block editing | **done** |
 | 4 The city (generator, sky, fog, lighting, loading screen) | **done** |
-| 5 ODM gear + swing camera | next |
-| 6–10 | see plan |
+| 5 ODM gear + swing camera | **done** |
+| 6 Kaiju rigs + placeholder carving | next |
+| 7–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -277,6 +278,71 @@ night park, day. **Bugs found on the way:** `?cam=` placed the wrong camera (dre
 after mount — place on the first frame instead); anchors floated in the air on setback towers (now the highest
 solid at each footprint corner); bulk `fillBox` recounted 8 192 voxels per call (now deferred to `endBulk`).
 
+### Phase 5 — ODM gear + swing camera (what exists)
+Attack-on-Titan style 3D manoeuvre gear: two hooks, a rope you swing on, reel, boost, air dash, gas.
+
+| Input | Action |
+|---|---|
+| hold Q / E | fire and hold the left / right hook (release to let go) |
+| Ctrl or R | reel in |
+| Space | jump on the ground; **boost** while roped and airborne |
+| F | air dash (one per airtime) |
+| touch | L HOOK / R HOOK / REEL (hold), DASH, plus the existing JUMP / BREAK / PLACE / CAM |
+
+- `utils/odm.js` — pure, no browser: `createOdm`, `odmUpdate` (per frame: firing, releasing, upkeep, reel, pump,
+  boost, dash, drag, speed cap, gas) and `odmConstraint` (the rope, run **inside every physics substep** through
+  `body.constraint`, which is what keeps a 55 m/s swing stable instead of stretching then snapping back).
+  `constants/odmConfig.js` has every number (gas costs, speeds, windows).
+- **The rope is a hard distance constraint, not a spring**: if the body is further than the rope length from the
+  anchor it is pulled back onto the sphere and *only the outward radial velocity is removed*, so tangential speed is
+  preserved exactly. Result: a clean pendulum (peak speed matches sqrt(2·g·h) within 5%), two ropes at once solved with
+  3 Gauss–Seidel passes, one-sided (a slack rope does nothing).
+- **Reel conserves angular momentum**: shortening the rope scales tangential speed by oldLen/newLen (capped at x1.25 per
+  frame) plus a small zip pull. (Found by test: positional projection alone shortens the rope without changing
+  velocity, so reeling at the bottom *lost* speed. This is the "pump".)
+- **Aim assist**: the crosshair ray goes first; if it misses, 8 rays in a Fibonacci spiral within 7° are tried (smallest
+  angle, then nearest). If nothing is hit (aiming at the sky), `snapAnchor` snaps to a roof corner from `city.anchors`
+  inside a 25° cone, preferring higher ones — so swinging across the skyline is reliable.
+- **Release pop**: let go within 0.25 s after the bottom of the arc (vy crosses from falling to rising) → x1.10
+  horizontal speed + a little lift. **Air dash**: 22 m/s along the stick direction (or the camera look), a 0.12 s
+  zero-g window (`body.gravityScale`), recharged by landing or firing a hook. **Boost**: 40 m/s² along the direction of
+  travel, 55 m/s cap (enforced after gravity too). **Pump**: forward input on the downswing adds speed along the arc.
+- **Gas** (100): hook -10, rope upkeep -4/s each, reel -10/s, boost -20/s, dash -18; refills +25/s on the ground after
+  0.4 s without spending, +6/s in the air after 1.5 s. At 0 you can't reel, boost or fire (you still swing).
+- **Anchors die with their block**: if the anchored block is destroyed the rope drops (a kaiju beam cutting your rope
+  mid-swing is a feature, phase 6+).
+- `components/Player.jsx` — controller around it: on the ground you ease to the wanted velocity; **in the air you steer
+  by acceleration** (25 m/s², capped at walking speed along the wish direction, x0.35 while roped) so you can nudge a
+  swing but never brake it for free; the body leans into the swing and faces the motion; health/score; **fall damage**
+  (landing faster than 28 m/s: 2.5 per m/s over), **wall damage** (>25 m/s into a wall), death → respawn at the spawn
+  with 2 s of immunity, the camera snapping with you. Score = swing distance / 4 + bonuses (`player.bonus` for later).
+- `components/Ropes.jsx` (8 cylinder segments per rope, slack sag, a ~0.07 s shoot animation, a glowing anchor marker),
+  `PlayerMesh` (arms reach toward the anchor), `Hud.jsx` (HEALTH + GAS bottom-left, SCORE top-centre, a red vignette
+  on damage; polled at 10 Hz).
+- **Camera feel** (`components/CameraRig.jsx`, `utils/shake.js`): the boom's pivot **lags more the faster you go** (smooth
+  time 0.07 → 0.22 s) and leads along the velocity; **FOV opens with speed** (70° → ~94°) with a 14° punch on a dash;
+  the view **banks into turns** (roll from the heading's rate of change, ±12.6°); the boom lengthens at speed but is still
+  pulled in by the voxel rays; when swinging fast and not touching the mouse it **auto-follows** the motion; **trauma
+  shake** (landings, wall hits, hook attach, dash) applied last. Everything is tuned from `constants/odmConfig.js` /
+  `playerConfig.js`.
+- **Deviations from the plan**: gas costs are lighter than the plan's (shot -10, not -25) so swinging is sustainable;
+  reel is Ctrl **or R** because Ctrl+W/S/etc. are browser shortcuts.
+
+**Verified in phase 5:** `bun test` 109 tests (31 new): the rope never stretches, it is a real pendulum (peak speed =
+sqrt(2gh), far side nearly as high, planar), 30 fps agrees with 144 fps, two ropes hold both lengths, no tunnelling into
+a wall at 40 m/s, the constraint removes only outward velocity, reel speeds you up and respects the minimum length, boost
+costs gas and respects the cap, no gas = no boost/reel/hook, dash once per airtime and recharges on landing, release pop
+only near the bottom of the arc, anchors (centre ray, assist cone, snap assist), destroyed anchor drops the rope, gas
+rules, trauma shake. `bench/odm-check.mjs` (17 checks in the real city): finds a tall building, fires a hook onto it,
+costs gas, the rope never stretches (worst overshoot 0.000), reel lifts you, a free-air swing with boost reaches 34 m/s,
+FOV opens 70.7° → 79.2°, swinging scores, F dashes, a long fall costs health, dying respawns. The phase 3/4 checks still
+pass (`play-check`, `touch-check` incl. the new buttons, `city-check`).
+
+**Not verified (needs hands):** how the swing *feels* — whether the numbers (speeds, gas, camera lag, FOV, auto-follow,
+bank) suit you. Everything is one file of constants; tell me what to change. Real-mouse input is still untested
+(headless Chrome can't pointer-lock). The roll sign was reasoned, not seen: if the view banks *away* from turns, flip the
+sign of `rollTarget` in `CameraRig.jsx`.
+
 ### Browser checks
 The gstack `browse` tool cannot create a WebGL context, and Chrome's `--virtual-time-budget` freezes
 `performance.now()` (every timing reads ~0). Use the real-time script, which drives Playwright's Chromium
@@ -291,6 +357,7 @@ Gameplay and touch have their own scripts (same setup, `PORT=1341` for a product
 ~/.nvm/versions/node/v24.13.0/bin/node bench/play-check.mjs /tmp/play 800x500   # 17 end-to-end checks (test world)
 ~/.nvm/versions/node/v24.13.0/bin/node bench/touch-check.mjs /tmp/touch          # touch controls (test world)
 ~/.nvm/versions/node/v24.13.0/bin/node bench/city-check.mjs /tmp/city            # the real city, 15 checks
+~/.nvm/versions/node/v24.13.0/bin/node bench/odm-check.mjs /tmp/odm              # ODM gear in the city, 17 checks
 ```
 (Run them by **absolute path** or from `godzilla-verse/`; a `cd` into `bench/` breaks the relative path.)
 Software GL runs at a few fps and the game clamps dt to 1/30, so simulated time runs slower than wall time:
