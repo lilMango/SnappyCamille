@@ -1,33 +1,19 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { easing } from 'maath';
 import { stats } from '../store';
-import { chunkWireframe, setChunkWireframe } from '../utils/chunkMaterial';
-import { usePointerLock } from '../hooks/usePointerLock';
+import { input } from '../utils/input';
+import { FREE_CAM_START, START_FREE, SPAWN } from '../utils/worldSelect';
 
-// Phase-1 free-fly camera for inspecting the voxel engine. Replaced by the player
-// controller + CameraRig in phase 3.
-//   click: capture mouse · WASD move · Space/E up · C/Q down · Shift fast
-//   wheel: fly speed · G: wireframe · Esc: release mouse
+// Debug free camera (V toggles it). It does not own any input: look direction and key state
+// come from InputController, so toggling hands over seamlessly in both directions — the
+// free camera starts where the player camera was, and the player resumes where they stood.
+//   WASD move · Space/E up · C/Q down · Shift fast · wheel: fly speed
+// Mounted only while free-cam is on.
 
-const TEST_START = { x: 32, y: 52, z: 108, yaw: 0, pitch: -0.28 };
-const CITY_START = { x: 192, y: 112, z: 345, yaw: 0, pitch: -0.5 }; // above the towers, looking in
-
-// Debug URL params, for reproducible shots: ?cam=x,y,z,yawDeg,pitchDeg  and  ?wire=1
-function readStart() {
-  const q = new URLSearchParams(window.location.search);
-  const c = (q.get('cam') || '').split(',').map(Number);
-  if (c.length === 5 && c.every(Number.isFinite)) {
-    return { x: c[0], y: c[1], z: c[2], yaw: (c[3] * Math.PI) / 180, pitch: (c[4] * Math.PI) / 180 };
-  }
-  return q.get('world') === 'city' ? CITY_START : TEST_START;
-}
-const START = readStart();
 const MIN_SPEED = 2;
 const MAX_SPEED = 120;
-const LOOK = 0.0022; // radians per pixel
-const MAX_PITCH = Math.PI / 2 - 0.01;
 
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const _fwd = new THREE.Vector3();
@@ -35,58 +21,39 @@ const _right = new THREE.Vector3();
 const _want = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
+let placed = false; // the very first free-cam mount may place the camera (URL pose)
+
 export default function FlyCamera() {
-  const { gl, camera } = useThree();
-  const state = useRef({
-    keys: new Set(),
-    yaw: START.yaw,
-    pitch: START.pitch,
-    speed: 14,
-    vel: new THREE.Vector3(),
-  });
+  const { camera } = useThree();
+  const st = useRef({ speed: 14, vel: new THREE.Vector3() });
 
   useEffect(() => {
-    camera.position.set(START.x, START.y, START.z);
-    if (new URLSearchParams(window.location.search).get('wire') === '1') setChunkWireframe(true);
-  }, [camera]);
+    if (START_FREE && !placed) {
+      placed = true;
+      if (FREE_CAM_START) {
+        camera.position.set(FREE_CAM_START.x, FREE_CAM_START.y, FREE_CAM_START.z);
+        input.yaw = FREE_CAM_START.yaw;
+        input.pitch = FREE_CAM_START.pitch;
+      } else {
+        camera.position.set(SPAWN.x, SPAWN.y + 7, SPAWN.z + 9); // ?free=1: above and behind the spawn
+      }
+    }
+    placed = true;
 
-  const onLook = useCallback((dx, dy) => {
-    const s = state.current;
-    s.yaw -= dx * LOOK;
-    s.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, s.pitch - dy * LOOK));
-  }, []);
-  usePointerLock(gl.domElement, onLook);
-
-  useEffect(() => {
-    const s = state.current;
-    const down = (e) => {
-      s.keys.add(e.code);
-      if (e.code === 'Space') e.preventDefault();
-      if (e.code === 'KeyG' && !e.repeat) setChunkWireframe(!chunkWireframe());
-    };
-    const up = (e) => s.keys.delete(e.code);
-    const blur = () => s.keys.clear();
+    const s = st.current;
     const wheel = (e) => {
       s.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, s.speed * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    window.addEventListener('blur', blur);
     window.addEventListener('wheel', wheel, { passive: true });
-    return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-      window.removeEventListener('blur', blur);
-      window.removeEventListener('wheel', wheel);
-    };
-  }, []);
+    return () => window.removeEventListener('wheel', wheel);
+  }, [camera]);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30); // a hitch must not teleport the camera
-    const s = state.current;
-    const k = s.keys;
+    const s = st.current;
+    const k = input.keys;
 
-    _euler.set(s.pitch, s.yaw, 0);
+    _euler.set(input.pitch, input.yaw, 0);
     camera.quaternion.setFromEuler(_euler);
 
     camera.getWorldDirection(_fwd);
@@ -102,11 +69,7 @@ export default function FlyCamera() {
 
     easing.damp3(s.vel, _want, 0.08, dt); // frame-rate-independent acceleration
     camera.position.addScaledVector(s.vel, dt);
-
     stats.speed = s.speed * fast;
-    stats.x = camera.position.x;
-    stats.y = camera.position.y;
-    stats.z = camera.position.z;
   });
 
   return null;

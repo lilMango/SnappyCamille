@@ -94,3 +94,29 @@ for (let f = 0; f < 6; f++) {
     SHADE_AO[f * 4 + ao] = Math.round(FACE_SHADE_U8[f] * Math.pow(AO_CURVE[ao], 2.2));
   }
 }
+
+// Representative colour per block (sparks, hotbar swatches) — roughly each tile's average.
+const COLORS = {
+  bedrock: 0x3b3d40,
+  stone: 0x7d7f83,
+  dirt: 0x6b4a2f,
+  grass: 0x5aa13e,
+  asphalt: 0x2f3033,
+  asphalt_line: 0x2f3033,
+  sidewalk: 0xb3b0a8,
+  concrete: 0x9a9a98,
+  concrete_dark: 0x62646a,
+  concrete_light: 0xc4c2bb,
+  brick: 0x9c4a3a,
+  glass: 0x1d3a52,
+  glass_lit: 0xe9b04a,
+  steel: 0x7b8794,
+  rubble: 0x77736c,
+  fence: 0x4a5260,
+};
+export const BLOCK_COLOR = new Uint32Array(256);
+for (const d of DEFS) BLOCK_COLOR[d.id] = COLORS[d.name] ?? 0xff00ff;
+
+// The world floor can't be dug through.
+export const UNBREAKABLE = new Uint8Array(256);
+UNBREAKABLE[B.BEDROCK] = 1;

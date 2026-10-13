@@ -5,10 +5,13 @@ import { stats } from '../store';
 // Samples the renderer into the mutable `stats` object a few times a second.
 export default function StatsProbe() {
   const acc = useRef({ t: 0, frames: 0 });
-  useFrame(({ gl }, dt) => {
+  useFrame(({ gl, camera }, dt) => {
     const a = acc.current;
     a.t += dt;
     a.frames++;
+    stats.x = camera.position.x;
+    stats.y = camera.position.y;
+    stats.z = camera.position.z;
     if (a.t < 0.25) return;
     stats.fps = a.frames / a.t;
     stats.calls = gl.info.render.calls;

@@ -6,15 +6,9 @@ import { buildSyntheticCity } from '../utils/syntheticCity';
 import { ChunkMeshManager } from '../utils/chunkMeshManager';
 import { chunkWireframe } from '../utils/chunkMaterial';
 import { stats } from '../store';
+import { WORLD_KIND, USE_WORKERS, RENDER_DIST_OVERRIDE } from '../utils/worldSelect';
 
-// Debug URL params (see CLAUDE.md):
-//   ?world=city   the 384x384 synthetic city (the phase-2 perf gate) instead of the test world
-//   ?workers=0    mesh on the main thread (compare against the worker pool)
-//   ?rd=N         render distance in chunks
-const params = new URLSearchParams(window.location.search);
-const CITY = params.get('world') === 'city';
-const WORKERS = params.get('workers') !== '0';
-const RD = Number(params.get('rd')) || undefined;
+const CITY = WORLD_KIND === 'city';
 
 // Renders the voxel world as ONE <group>; the manager adds/removes the section meshes
 // imperatively, so a remesh never touches React.
@@ -30,7 +24,7 @@ export default function ChunkRenderer() {
       else buildTestWorld(world);
       stats.genMs = performance.now() - t0;
     }
-    manager.current = new ChunkMeshManager(world, groupRef.current, { workers: WORKERS, renderDist: RD });
+    manager.current = new ChunkMeshManager(world, groupRef.current, { workers: USE_WORKERS, renderDist: RENDER_DIST_OVERRIDE });
     stats.sections = world.sectionCount();
     stats.world = CITY ? 'synthetic city 384x384' : 'test world 64x64';
     return () => {

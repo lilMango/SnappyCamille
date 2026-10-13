@@ -29,6 +29,7 @@ bun run build        # static build to build/
 bun run preview      # serve build/ on :1340 — use this to test the subpath + workers
 bun test             # mesher, voxel-world and mesh-manager unit tests (bun's runner; no WebGL needed)
 bun run bench        # perf gate: build the 384x384 synthetic city, mesh it, print sizes + timings
+                     # (browser checks: see "Browser checks" below — bench/*.mjs, need Node >= 20)
 bun run build:deploy # build -> copy to ../public/godzilla-verse -> ../deploy.sh (FTP)
 ```
 `vite.config.js` sets `base: '/godzilla-verse/'`; runtime assets load from
@@ -47,8 +48,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | 0 Scaffold + route + pipeline | **done** |
 | 1 Voxel core | **done** |
 | 2 Worker meshing + AO + cutout pass + budgets (+ perf gate) | **done** |
-| 3 Player + physics + camera shell + block editing | next |
-| 4–10 | see plan |
+| 3 Player + physics + camera shell + block editing | **done** |
+| 4 The city (generator, sky, fog, lighting) | next |
+| 5–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -97,10 +99,11 @@ lives only in the main checkout. Deploy from the main checkout.
 - `utils/testWorld.js` — 64x64 crossroads with hollow towers that cross the y=32/64 section
   borders, an open door, rubble, and a floating cube straddling x/y/z borders.
 
-**Debug URL params:** `?cam=x,y,z,yawDeg,pitchDeg` starts the camera there; `?wire=1` starts in
-wireframe; `?world=city` loads the 384x384 synthetic city; `?workers=0` meshes on the main thread;
-`?rd=N` sets the render distance in chunks. Handy for reproducible screenshots, e.g. the border
-cube: `?cam=16,36,44,0,-14`.
+**URL params** (all parsed in `utils/worldSelect.js`): `?world=city` loads the 384x384 synthetic
+city; `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in it
+at the spawn); `?wire=1` starts in wireframe; `?workers=0` meshes on the main thread; `?rd=N` sets the
+render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on touch
+devices). Handy for reproducible screenshots, e.g. the border cube: `?cam=16,36,44,0,-14`.
 
 **Verified in phase 1:** face counts, outward winding of every triangle, culling across section
 borders incl. a cube meeting 8 sections, 32-bit index switch, dirty marking, height tracking
@@ -158,6 +161,63 @@ meaningless. Measure those on a real GPU before phase 5. If it's too heavy, the 
 order: floor slabs every 8 (halves interior quads), `RENDER_DIST` 8, `SECTION_H` 64, then a
 `DataArrayTexture` + greedy mesher.
 
+### Phase 3 — player, physics, camera shell, block editing (what exists)
+**You now start as a character on the road** (the free camera is `V`, or `?cam=` / `?free=1`).
+
+| Input | Action |
+|---|---|
+| click canvas | capture the mouse (Esc releases) |
+| WASD / arrows | move, relative to where the camera looks |
+| Shift / Space | sprint / jump |
+| LMB / RMB | break / place the selected block (hold to repeat) |
+| 1–9 or wheel | hotbar |
+| F5 | camera: third-person back → first-person → third-person front |
+| V / G | free camera / wireframe |
+| touch | floating joystick (push past the ring to sprint), drag the right half to look, JUMP / BREAK / PLACE / CAM buttons, tap hotbar slots |
+
+- `utils/physics.js` — `moveBody(world, body, dt)`: swept AABB resolved Y → X → Z against `world.isSolid`,
+  **substeps of <= 0.4 m** (no tunnelling at any speed), slides along walls, **auto-step-up**, ceiling
+  bumps. Pure, shared by the player now and debris/kaiju feet later. `sweep()` and `bodyOverlapsCell()` are exported.
+- `utils/raycast.js` — allocation-free Amanatides & Woo DDA (`raycastVoxel`): used for block targeting
+  and the camera's wall pull-in now, grapple anchors and beams later.
+- `utils/input.js` — the one mutable `input` object that keyboard, mouse and touch all write into.
+  `components/InputController.jsx` owns every DOM listener, pointer lock and the shared yaw/pitch
+  (so the player camera and the free camera hand over seamlessly). Mount order is frame order in `App.jsx`:
+  input → player → interaction → camera → meshing.
+- `components/Player.jsx` (controller + blob shadow), `PlayerMesh.jsx` (box-built Survey-Corps character
+  with a walk/air animation driven by the mutable `player` object), `CameraRig.jsx` (F5 modes; the boom is
+  pulled in by 5 guard rays — a hard snap in, eased out — so the camera can never end up inside a building),
+  `BlockInteraction.jsx` (reach-checked crosshair ray from the *eye*, outline, break/place with cooldowns,
+  refuses to place inside the player, bedrock is unbreakable), `Sparks.jsx` (pooled break burst),
+  `Hotbar.jsx`, `Crosshair.jsx`, `MobileControls.jsx`, `Lighting.jsx`.
+- `constants/playerConfig.js` — all the numbers (walk 6 / sprint 10 m/s, jump 8.6 → ~1.3 blocks,
+  gravity 28, boom 4.5, reach 6, hotbar blocks).
+- **Deviation from the plan:** auto-step height is **1.0**, not 0.6. A 0.6 step cannot climb a 1-block
+  curb, and in a city of raised sidewalks you'd have to jump every kerb.
+- **Lighting:** chunks are unlit (baked vertex shading), but the character uses toon materials, which are
+  black without lights — `Lighting.jsx` supplies a placeholder day rig (no shadow maps; blob shadow instead).
+  Phase 4 retunes it for dusk/night.
+- `window.__gv` exposes `{ player, input, camState, target, stats, world, useGame }` for automated checks.
+
+**Verified in phase 3:**
+- `bun test`: 61 tests (27 new) — landing/standing without jitter, identical landing at 30 and 144 fps,
+  walking across column borders, stopped by a 2-block wall, steps a curb and a staircase, no step-up
+  under a low ceiling, wall sliding, no tunnelling at 80 m/s (30 and 20 fps), jump apex, can't jump a
+  2-block wall, ceiling bump; raycast faces/normals/distances, negative coordinates, column borders,
+  starting inside a block, grid-line skimming.
+- `bench/play-check.mjs` — 17 end-to-end checks in a real browser, **stable over repeated runs, in dev and
+  in the production build**: spawn + gravity, walk, curb step-up (y reaches exactly 22.00), wall stop
+  (x = 20.300 exactly), jump, target, break, remesh after the edit (quad count changes), place, refusing
+  to entomb the player, F5 cycling without a reload, free-cam handoff, clean console.
+- `bench/touch-check.mjs` — 15 checks with **real touch events** (Chrome DevTools Protocol): controls are
+  shown, joystick forward/sprint/release, look pad, JUMP/BREAK/PLACE/CAM buttons, joystick + look pad at once.
+- Screenshots reviewed for: the character (it was solid black until `Lighting.jsx`), a mobile layout (the
+  debug panels used to cover the buttons, so they're now hidden on touch devices), and the player in the city.
+
+**Not verified:** the real mouse path (headless Chrome can't acquire pointer lock, so `mousedown`/look
+deltas were exercised through the shared `input` object rather than real mouse events); how the movement
+*feels* on a real GPU/mouse (tuning constants are in `playerConfig.js`); touch on a physical phone.
+
 ### Browser checks
 The gstack `browse` tool cannot create a WebGL context, and Chrome's `--virtual-time-budget` freezes
 `performance.now()` (every timing reads ~0). Use the real-time script, which drives Playwright's Chromium
@@ -167,6 +227,15 @@ with SwiftShader and waits for the mesh queue to settle:
 # production build: `bun x vite preview --port 1341` in another shell, then prefix PORT=1341
 ```
 It exits non-zero on any console error/warning (GPU-driver noise excluded). Needs Node >= 20.
+Gameplay and touch have their own scripts (same setup, `PORT=1341` for a production preview):
+```bash
+~/.nvm/versions/node/v24.13.0/bin/node bench/play-check.mjs /tmp/play 800x500   # 17 end-to-end checks
+~/.nvm/versions/node/v24.13.0/bin/node bench/touch-check.mjs /tmp/touch          # touch controls
+```
+Software GL runs at a few fps and the game clamps dt to 1/30, so simulated time runs slower than wall time:
+every wait in these scripts polls for a *condition*. Two rules learned the hard way — after a teleport, wait for
+a target that has held still across two samples (`stableTarget`), and after dispatching a touch event, poll for
+the resulting state rather than reading once (the main thread is busy rendering).
 
 ## Conventions (house style)
 - **Mutable state outside React.** Per-frame data (player, camera, kaiju, ODM) lives in

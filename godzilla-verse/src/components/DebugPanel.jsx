@@ -23,8 +23,9 @@ export default function DebugPanel() {
     ['workers', s.workers || 'off (main thread)'],
     ['remesh latency', `${s.latAvg.toFixed(1)} avg · ${s.latMax.toFixed(0)} max ms`],
     ['mesh mgr ms/frame', s.meshMs.toFixed(2)],
-    ['pos', `${s.x.toFixed(0)}, ${s.y.toFixed(0)}, ${s.z.toFixed(0)}`],
-    ['fly speed', `${s.speed.toFixed(0)} m/s`],
+    ['camera pos', `${s.x.toFixed(0)}, ${s.y.toFixed(0)}, ${s.z.toFixed(0)}`],
+    ['player', `${s.grounded ? 'grounded' : 'airborne'} · ${s.hSpeed.toFixed(1)} m/s`],
+    ['target', s.target || '—'],
   ];
 
   return (
@@ -38,8 +39,8 @@ export default function DebugPanel() {
       ))}
       <div style={styles.hint}>
         {s.locked
-          ? 'WASD move · Space/E up · C/Q down · Shift fast · wheel speed · G wireframe · Esc release'
-          : 'Click the scene to look around'}
+          ? 'WASD · Shift sprint · Space jump · LMB break · RMB place · 1-9/wheel hotbar · F5 camera · V free-cam · G wireframe · Esc release'
+          : 'Click the scene to capture the mouse'}
       </div>
     </div>
   );

@@ -2,18 +2,34 @@ import { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { AdaptiveDpr, Loader, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
+import BlockInteraction from './components/BlockInteraction';
+import CameraRig from './components/CameraRig';
 import ChunkRenderer from './components/ChunkRenderer';
+import Crosshair from './components/Crosshair';
 import DebugPanel from './components/DebugPanel';
 import FlyCamera from './components/FlyCamera';
 import GlErrorBoundary from './components/GlErrorBoundary';
+import Hotbar from './components/Hotbar';
+import InputController from './components/InputController';
+import Lighting from './components/Lighting';
+import MobileControls from './components/MobileControls';
+import Player from './components/Player';
 import ProbeHud from './components/ProbeHud';
+import Sparks from './components/Sparks';
 import StatsProbe from './components/StatsProbe';
-import { useGame } from './store';
+import { useGame, player, camState, target, stats } from './store';
+import { input } from './utils/input';
+import { IS_TOUCH, SHOW_DEBUG } from './utils/worldSelect';
+import { world } from './utils/voxelWorld';
 import { FOG_FAR, FOG_NEAR } from './constants/worldConfig';
 import { TILES, ATLAS_SIZE } from './utils/atlas';
 
-// Daytime placeholder for the phase-1 test world; the city (phase 4) goes dusk/night.
+// Daytime placeholder for the test world; the city (phase 4) goes dusk/night.
 const SKY = '#9ccaf0';
+
+// Dev/test hook (like the sibling projects' window.__player): lets automated checks drive
+// the game and read its state.
+if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame };
 
 // Phase 0 probe: a module worker created the same way the real mesh/city workers
 // will be. If this reports OK on the deployed host, `base` + workers are proven.
@@ -48,6 +64,7 @@ function useWorkerProbe() {
 
 export default function App() {
   const setProbe = useGame((s) => s.setProbe);
+  const freeCam = useGame((s) => s.freeCam);
   useWorkerProbe();
   useEffect(() => {
     setProbe({ atlas: `OK (${TILES.length} tiles, ${ATLAS_SIZE}px)` });
@@ -68,16 +85,29 @@ export default function App() {
           <fog attach="fog" args={[SKY, FOG_NEAR, FOG_FAR]} />
           <PerspectiveCamera makeDefault fov={70} near={0.1} far={400} />
           <AdaptiveDpr pixelated />
+          <Lighting />
+          {/* Mount order is frame order: input -> player -> interaction -> camera -> meshing */}
+          <InputController />
+          <Player />
+          <BlockInteraction />
+          <Sparks />
+          {freeCam ? <FlyCamera /> : <CameraRig />}
           <Suspense fallback={null}>
             <ChunkRenderer />
           </Suspense>
-          <FlyCamera />
           <StatsProbe />
         </Canvas>
         <Loader />
       </GlErrorBoundary>
-      <ProbeHud />
-      <DebugPanel />
+      <Crosshair />
+      <Hotbar />
+      {IS_TOUCH && <MobileControls />}
+      {SHOW_DEBUG && (
+        <>
+          <ProbeHud />
+          <DebugPanel />
+        </>
+      )}
     </>
   );
 }
