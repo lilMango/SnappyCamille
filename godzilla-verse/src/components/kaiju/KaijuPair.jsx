@@ -102,7 +102,7 @@ export default function KaijuPair() {
 
 function stomp(d, e, cam) {
   const S = KAIJU.stomp;
-  d.applyDamage({ shape: 'sphere', cx: e.x, cy: GROUND_Y + 1, cz: e.z, radius: S.radius, minY: GROUND_Y - S.depth, source: 'stomp', seed: (e.x * 7 + e.z * 13) | 0 });
+  d.applyDamage({ shape: 'sphere', cx: e.x, cy: GROUND_Y + 3, cz: e.z, radius: S.radius, source: 'stomp', seed: (e.x * 7 + e.z * 13) | 0 });
   kaiju.stats.stomps++;
   addTraumaAt(0.45, e.x, GROUND_Y, e.z, cam.x, cam.y, cam.z);
   emitDust(e.x, GROUND_Y + 2, e.z, 9, 6, 8, 3);

@@ -68,7 +68,6 @@ export const KAIJU = {
   // footfalls
   stomp: {
     radius: 4,
-    depth: 2,
     playerRadius: 10,
     playerDamage: 20,
   },
@@ -79,7 +78,7 @@ export const KAIJU = {
     toppleThreshold: 0.35, // a building below this fraction of its voxels comes down
     toppleSeconds: 0.5,
     debrisPerFrame: 48,
-    minY: GROUND_Y + 2, // body/beam carves never touch the street surface or below
+    minY: GROUND_Y + 2, // body/beam carves never touch the ground (street, sidewalk, anything at or below GROUND_Y + 1)
   },
 };
 

@@ -372,7 +372,7 @@ stomp, smash what they walk through, and fire their weapons at buildings. `?kaij
   puffs). The jaw and the beam impact also light the *unlit chunks* through two point glows in `chunkMaterial` (`worldGlow`).
 - **Weapons**: atomic breath = DDA beam from the jaw (length stops at the first block), head sweeps ±30°, a bore every 70 ms at
   the impact point. Gravity lightning = 3 heads × a strike every 0.3 s (midpoint-displaced bolts, a blast sphere each; 22% of
-  strikes aim near the player). Footfalls carve a crater (down to `GROUND_Y - 2`), shake the camera, hurt a player within 10 blocks.
+  strikes aim near the player). Footfalls knock chunks out of whatever stands at street level (the ground itself is never destructible), shake the camera, hurt a player within 10 blocks.
 - **Constants**: `constants/kaijuConfig.js` (everything tunable). Godzilla spawns north of the park walking south; Ghidorah hovers
   at ~86 blocks over the west side.
 - Hooks for checks: `window.__gv.kaiju` (`list[{ctl, brain}]`, `destruction`, `stats`), `__gv.fx`, `__gv.forceBeam(i)`.
