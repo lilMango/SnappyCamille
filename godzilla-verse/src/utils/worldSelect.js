@@ -14,6 +14,8 @@ const params = new URLSearchParams(typeof window !== 'undefined' ? window.locati
 
 const w = params.get('world');
 export const WORLD_KIND = w === 'test' ? 'test' : w === 'synthetic' ? 'synthetic' : 'city';
+// kaiju (phase 6): on in the real city, off in the engine test worlds; ?kaiju=0|1 overrides
+export const KAIJU_ON = params.get('kaiju') ? params.get('kaiju') !== '0' : WORLD_KIND === 'city';
 export const USE_WORKERS = params.get('workers') !== '0';
 export const RENDER_DIST_OVERRIDE = Number(params.get('rd')) || undefined;
 

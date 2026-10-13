@@ -45,7 +45,7 @@ export function respawn() {
   resetShake();
 }
 
-function hurt(amount) {
+export function hurt(amount) {
   if (player.invulnerable > 0) return;
   player.health -= amount;
   if (player.health <= 0) respawn();

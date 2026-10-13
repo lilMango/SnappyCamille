@@ -12,15 +12,32 @@ import { atlasTexture } from './atlas';
 
 export const worldTint = { value: new THREE.Color(1, 1, 1) };
 
+// Two point glows (a beam's impact, a charged jaw) that light the unlit chunks: xyz + radius, and an
+// rgb intensity each. Zero intensity = off. Written by the kaiju effects every frame.
+export const worldGlow = {
+  pos: { value: [new THREE.Vector4(0, -999, 0, 1), new THREE.Vector4(0, -999, 0, 1)] },
+  col: { value: [new THREE.Vector3(), new THREE.Vector3()] },
+};
+
 function patchTint(material) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTint = worldTint;
+    shader.uniforms.uGlowP = worldGlow.pos;
+    shader.uniforms.uGlowC = worldGlow.col;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aEmit;\nvarying float vEmit;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEmit = aEmit;');
+      .replace('#include <common>', '#include <common>\nattribute float aEmit;\nvarying float vEmit;\nvarying vec3 vWorldPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEmit = aEmit;\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vEmit;\nuniform vec3 uTint;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix(uTint, vec3(1.0), vEmit);');
+      .replace('#include <common>', '#include <common>\nvarying float vEmit;\nvarying vec3 vWorldPos;\nuniform vec3 uTint;\nuniform vec4 uGlowP[2];\nuniform vec3 uGlowC[2];')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        diffuseColor.rgb *= mix(uTint, vec3(1.0), vEmit);
+        for (int i = 0; i < 2; i++) {
+          float gf = max(0.0, 1.0 - distance(vWorldPos, uGlowP[i].xyz) / uGlowP[i].w);
+          diffuseColor.rgb += uGlowC[i] * (gf * gf);
+        }`,
+      );
   };
   // one program for the opaque and one for the cutout material (different alphaTest/side)
   material.customProgramCacheKey = () => 'chunk-tint';

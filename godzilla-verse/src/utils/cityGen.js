@@ -449,6 +449,18 @@ export function generateCity(world, { seed = C.SEED, onProgress = () => {} } = {
   onProgress('finishing', 0.96);
   world.endBulk();
 
+  // Original voxel count per building (for destruction: a building below 35% of this collapses).
+  // Counted here, in the generation worker, so the main thread never has to scan the city.
+  for (const b of buildings) {
+    let n = 0;
+    for (let z = b.z0; z <= b.z1; z++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        for (let y = C.BUILD_Y; y <= b.y1 + 30; y++) if (world.getBlock(x, y, z) !== B.AIR) n++;
+      }
+    }
+    b.voxelsOrig = n;
+  }
+
   const t1 = typeof performance !== 'undefined' ? performance.now() : 0;
   return {
     lotMap,

@@ -55,6 +55,14 @@ export const city = {
   stats: null,
 };
 
+// The kaiju (phase 6): each entry is { ctl: KaijuController, brain, events, view } and `destruction` is the
+// shared damage seam (created once the city exists). Mutable; written by KaijuPair, read by effects + checks.
+export const kaiju = {
+  list: [],
+  destruction: null,
+  stats: { stomps: 0, bores: 0, strikes: 0, debris: 0, playerHits: 0 },
+};
+
 // The ray block targeting uses; written by CameraRig, read by BlockInteraction.
 export const camState = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: -1 };
 

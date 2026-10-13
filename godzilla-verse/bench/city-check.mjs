@@ -29,7 +29,7 @@ async function open(query) {
     if (['error', 'warning'].includes(m.type()) && !/GPU stall|GL Driver/.test(m.text())) problems.push(`${m.type()}: ${m.text()}`);
   });
   page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-  await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?${query}`);
+  await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?kaiju=0&${query}`);
   return { page, problems };
 }
 async function waitFor(page, fn, arg, timeoutMs = 120000) {

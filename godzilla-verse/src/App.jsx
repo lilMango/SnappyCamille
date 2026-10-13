@@ -22,9 +22,11 @@ import Sky from './components/Sky';
 import Sparks from './components/Sparks';
 import Surroundings from './components/Surroundings';
 import StatsProbe from './components/StatsProbe';
-import { useGame, player, camState, target, stats, city, odm } from './store';
+import { useGame, player, camState, target, stats, city, odm, kaiju } from './store';
+import KaijuPair from './components/kaiju/KaijuPair';
+import { fx } from './utils/kaiju/fx';
 import { input } from './utils/input';
-import { IS_TOUCH, SHOW_DEBUG } from './utils/worldSelect';
+import { IS_TOUCH, SHOW_DEBUG, KAIJU_ON } from './utils/worldSelect';
 import { world } from './utils/voxelWorld';
 import { SKY_PRESETS } from './constants/skyConfig';
 import { worldTint } from './utils/chunkMaterial';
@@ -37,7 +39,15 @@ worldTint.value.set(PRESET.tint); // before any chunk material compiles
 
 // Dev/test hook (like the sibling projects' window.__player): lets automated checks drive
 // the game and read its state.
-if (typeof window !== 'undefined') window.__gv = { player, input, camState, target, stats, world, useGame, city, odm };
+if (typeof window !== 'undefined') {
+  window.__gv = {
+    player, input, camState, target, stats, world, useGame, city, odm, kaiju, fx,
+    // checks: make kaiju `i` breathe/strike as soon as its weapon allows
+    forceBeam: (i) => {
+      if (kaiju.list[i]) kaiju.list[i].brain.forceBeam = true;
+    },
+  };
+}
 
 // Phase 0 probe: a module worker created the same way the real mesh/city workers
 // will be. If this reports OK on the deployed host, `base` + workers are proven.
@@ -100,6 +110,7 @@ export default function App() {
           <BlockInteraction />
           <Ropes />
           <Sparks />
+          {KAIJU_ON && <KaijuPair />}
           {freeCam ? <FlyCamera /> : <CameraRig />}
           <Sky />
           <Surroundings />

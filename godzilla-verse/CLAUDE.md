@@ -52,8 +52,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | 3 Player + physics + camera shell + block editing | **done** |
 | 4 The city (generator, sky, fog, lighting, loading screen) | **done** |
 | 5 ODM gear + swing camera | **done** |
-| 6 Kaiju rigs + placeholder carving | next |
-| 7–10 | see plan |
+| 6 Kaiju rigs + placeholder carving (destruction seam, beams, debris/dust, intent contract) | **done** |
+| 7 Combat FSM + Director | next |
+| 8–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -106,7 +107,7 @@ lives only in the main checkout. Deploy from the main checkout.
 `?world=test` is the 64x64 engine test world (daytime; what `play-check`/`touch-check` use) and
 `?world=synthetic` the phase-2 box-tower perf-gate world; `?time=day|dusk|night` (dusk for the city, day for
 the others); `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in
-it at the spawn); `?wire=1` starts in wireframe; `?workers=0` meshes and generates on the main thread;
+it at the spawn); `?wire=1` starts in wireframe; `?kaiju=0|1` turns the kaiju off/on (on in the city, off in the test worlds); `?workers=0` meshes and generates on the main thread;
 `?rd=N` sets the render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on
 touch devices). Handy for reproducible screenshots, e.g. the border cube: `?world=test&cam=16,36,44,0,-14`.
 
@@ -343,6 +344,57 @@ bank) suit you. Everything is one file of constants; tell me what to change. Rea
 (headless Chrome can't pointer-lock). The roll sign was reasoned, not seen: if the view banks *away* from turns, flip the
 sign of `rollTarget` in `CameraRig.jsx`.
 
+### Phase 6 — kaiju (what exists)
+Godzilla and King Ghidorah now live in the city. They **wander** (heading for buildings, not fighting yet — that is phase 7),
+stomp, smash what they walk through, and fire their weapons at buildings. `?kaiju=0` turns them off.
+
+- **Intent contract** (`utils/kaiju/controller.js`): a brain produces *intent* `{moveX, moveZ, faceYaw, wantBeam, wantMelee,
+  wantGrab, wantRoar, wantDash, clashPressure}`; `KaijuController` turns it into locomotion (heavy: turn limits, slows to
+  fire), the weapon state machine (idle → charging → firing → cooldown, `motion.charge` 0..1), gait footfalls, hover/flap,
+  and *events* (footfall, carve, weapon). `utils/kaiju/brain.js` `WanderBrain` is the phase-6 AI; the phase-7 combat brain
+  and the phase-9 player controller are drop-in replacements. Pure, no THREE.
+- **Destruction seam** (`utils/destruction.js`): `applyDamage({ shape: sphere | capsule | cylinder | flatten, ... })`. Phase 6
+  implements it with carving (ragged rim, never carves bedrock or below `minY`), a **FIFO budget** (1 500 voxels/frame) so a beam
+  "eats" through a tower over a few frames and nothing can stall one, per-building integrity from the city's lot map, and a
+  scripted **top-down collapse** when a building drops below 35% of its voxels. Removed voxels (`rx/ry/rz/rid`) feed the debris.
+  Phase 10 swaps real physics in behind the same signature.
+- **Rigs** (`utils/kaiju/rigKit.js`, `rigParts.js`, `rigAnim.js`): authored ~7 units tall, root scaled x10 (~70 blocks). Every
+  box/cone of a joint is merged into one geometry with vertex colours (pebbled hide noise) plus two per-vertex attributes,
+  `aGlow` (vein / plate / eye) and `aSpine` (0 tail tip → 1 head). `kaijuMaterial` is a toon material whose emissive comes from
+  those and three uniforms driven by the one number `motion.charge`: **plates light in a wave from tail to head**, veins and
+  eyes follow, the head rears back, the jaw opens, then it thrusts forward to fire. Godzilla: 3 rows of dorsal plates, 8-segment
+  tail, charcoal hide / pale belly / icy-blue plates. Ghidorah: gold, 3 necks × 3 segments + heads (own phases), 2 bat wings
+  (shoulder + elbow), 2 tails, crest and cracks that light with the charge. Outlines only on joints > 0.9 radius (each outline
+  is another draw call); the whole kaiju is one frustum-cull unit.
+- **Effects** (`components/kaiju/`): `KaijuPair` (the sim + event handling), `KaijuRig`, `Beams` (atomic breath: three nested
+  additive cylinders white → cyan → blue, charge ball, impact glow, 2 permanent point lights; lightning: instanced stretched
+  boxes, gold body + white core), `Debris` (2 048 tinted cubes, ballistic + bounce on the height map), `Dust` (512 camera-facing
+  puffs). The jaw and the beam impact also light the *unlit chunks* through two point glows in `chunkMaterial` (`worldGlow`).
+- **Weapons**: atomic breath = DDA beam from the jaw (length stops at the first block), head sweeps ±30°, a bore every 70 ms at
+  the impact point. Gravity lightning = 3 heads × a strike every 0.3 s (midpoint-displaced bolts, a blast sphere each; 22% of
+  strikes aim near the player). Footfalls carve a crater (down to `GROUND_Y - 2`), shake the camera, hurt a player within 10 blocks.
+- **Constants**: `constants/kaijuConfig.js` (everything tunable). Godzilla spawns north of the park walking south; Ghidorah hovers
+  at ~86 blocks over the west side.
+- Hooks for checks: `window.__gv.kaiju` (`list[{ctl, brain}]`, `destruction`, `stats`), `__gv.fx`, `__gv.forceBeam(i)`.
+
+**Verified in phase 6:** `bun test` 175 tests (66 new: kaiju controller/intent contract, destruction budget + collapse, weapon
+maths, rig geometry/attributes/pose), plus `bench/kaiju-check.mjs` (22 checks in the real city, dev and production build): both
+kaiju exist and move, footfalls stomp and hurt a player standing there, a body walked through a building drops it below 35% and
+collapses it, the breath charges → fires → stops at a building and bores into it → switches off, Ghidorah's bolts strike the city,
+debris is thrown, clean console, `?kaiju=0` really turns it off. `bench/kaiju-shots.mjs` writes free-camera screenshots (reviewed:
+Godzilla in profile with glowing plates/veins and the beam, Ghidorah's silhouette and lightning). The phase 3–5 checks still pass
+(city/odm checks now load with `?kaiju=0`).
+
+**Perf (software GL, numbers from `bench`/checks):** the kaiju add ~67 draw calls when both are in view (17 + 25 merged joint
+meshes + ~15 outlines + effects pools); downtown looking at them lands at **430–510 total** (chunks 264–400 + kaiju + player/ropes)
+— above the plan's 450 *target*, so the check's ceiling is 540. Knobs if a real GPU needs it: kaiju outlines off (−15), `?rd=9`
+(−60), fewer tail/neck segments. Destruction: ≤1 500 voxel removals/frame; a collapse removes a 14×14×40 building in 0.5 s.
+
+**Not verified (needs a real GPU/hands):** real-GPU frame rate with the kaiju, how the weapons *feel*, whether the kaiju read as
+Godzilla/Ghidorah to *you* (judged only from software-GL screenshots at dusk), real-mouse input, a phone, the live FTP deploy.
+Known gaps (by design, later phases): kaiju ignore each other and the player (phase 7), no beam clash/bloom (phase 8), no audio or
+playable kaiju (phase 9), debris is ballistic cubes and collapse is a scripted top-down shave, not physics (phase 10).
+
 ### Browser checks
 The gstack `browse` tool cannot create a WebGL context, and Chrome's `--virtual-time-budget` freezes
 `performance.now()` (every timing reads ~0). Use the real-time script, which drives Playwright's Chromium
@@ -358,6 +410,8 @@ Gameplay and touch have their own scripts (same setup, `PORT=1341` for a product
 ~/.nvm/versions/node/v24.13.0/bin/node bench/touch-check.mjs /tmp/touch          # touch controls (test world)
 ~/.nvm/versions/node/v24.13.0/bin/node bench/city-check.mjs /tmp/city            # the real city, 15 checks
 ~/.nvm/versions/node/v24.13.0/bin/node bench/odm-check.mjs /tmp/odm              # ODM gear in the city, 17 checks
+~/.nvm/versions/node/v24.13.0/bin/node bench/kaiju-check.mjs /tmp/kaiju          # both kaiju: stomp, collapse, breath, lightning, 22 checks
+~/.nvm/versions/node/v24.13.0/bin/node bench/kaiju-shots.mjs /tmp/kaiju-shots    # free-camera screenshots of both kaiju for review
 ```
 (Run them by **absolute path** or from `godzilla-verse/`; a `cd` into `bench/` breaks the relative path.)
 Software GL runs at a few fps and the game clamps dt to 1/30, so simulated time runs slower than wall time:
