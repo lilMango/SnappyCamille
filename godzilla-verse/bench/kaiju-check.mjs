@@ -15,6 +15,8 @@ const { chromium } = await import(corePath);
 const outDir = process.argv[2] || '/tmp/kaiju-check';
 mkdirSync(outDir, { recursive: true });
 const BASE = `http://localhost:${process.env.PORT || 1340}/godzilla-verse/`;
+// the phase-6 scenarios are scripted one kaiju at a time, so run them with the wandering AI (no fighting)
+const FIGHT_OFF = `${BASE}?fight=0`;
 
 const browser = await chromium.launch({
   headless: true,
@@ -44,7 +46,7 @@ async function waitFor(fn, arg, timeoutMs = 120000) {
   return null;
 }
 
-await page.goto(BASE);
+await page.goto(FIGHT_OFF);
 await waitFor(() => window.__gv && window.__gv.city.ready);
 await waitFor(() => window.__gv.player.body.grounded, null, 30000);
 

@@ -5,6 +5,11 @@ import { world } from '../../utils/voxelWorld';
 import { Destruction } from '../../utils/destruction';
 import { KaijuController } from '../../utils/kaiju/controller';
 import { WanderBrain } from '../../utils/kaiju/brain';
+import { CombatBrain } from '../../utils/kaiju/combat';
+import { Fight } from '../../utils/kaiju/fight';
+import { Director } from '../../utils/kaiju/director';
+import { FIGHT_ON } from '../../utils/worldSelect';
+import { BASE_Y } from '../../constants/cityConfig';
 import { aimDir, beamEnd, distToSegment, lightningBolt } from '../../utils/kaiju/weapons';
 import { fx, nextBolt, BOLT_LEVELS } from '../../utils/kaiju/fx';
 import { mulberry32 } from '../../utils/rng';
@@ -23,7 +28,19 @@ import Dust, { emitDust } from './Dust';
 // dust) through the one Destruction seam, then lets Destruction work through its budgeted queue and
 // throws the removed voxels as debris. Rigs, beams, debris and dust are drawn by sibling components.
 
-const ctx = { buildings: null, player: { x: 0, z: 0 } };
+const ctx = { buildings: null, player: { x: 0, z: 0 }, foe: null, director: null };
+const NAME = { godzilla: 'GODZILLA', ghidorah: 'KING GHIDORAH' };
+let announceId = 0;
+
+/** A title card: the HUD shows it for a couple of seconds. */
+function announce(text) {
+  kaiju.announce = { text, until: performance.now() + 2600, id: ++announceId };
+}
+
+/** Spectacle points, only when the player is close enough to be watching. */
+function give(points, x, z) {
+  if (Math.hypot(player.body.x - x, player.body.z - z) < KAIJU.fight.score.witnessRange) player.bonus += points;
+}
 const _dir = { x: 0, y: 0, z: 1 };
 const _end = { len: 0, hit: false, x: 0, y: 0, z: 0 };
 const _mz = { x: 0, y: 0, z: 0 };
@@ -32,7 +49,7 @@ const _drain = [];
 function makeEntry(kind, rng) {
   const ctl = new KaijuController(kind, rng);
   ctl.view = { valid: false, muzzle: { x: 0, y: 0, z: 0 }, heads: [[0, 0, 0], [0, 0, 0], [0, 0, 0]] };
-  return { ctl, brain: new WanderBrain(rng), events: [], bore: 0, strike: 0, rng };
+  return { ctl, brain: FIGHT_ON ? new CombatBrain(rng) : new WanderBrain(rng), events: [], bore: 0, strike: 0, rng };
 }
 
 export default function KaijuPair() {
@@ -42,10 +59,14 @@ export default function KaijuPair() {
     const rng = mulberry32(6150);
     const list = [makeEntry('godzilla', rng), makeEntry('ghidorah', rng)];
     kaiju.list = list;
+    kaiju.director = new Director(list.map((k) => k.ctl));
+    kaiju.fight = new Fight(list[0].ctl, list[1].ctl, rng);
     setEntries(list);
     return () => {
       kaiju.list = [];
       kaiju.destruction = null;
+      kaiju.fight = null;
+      kaiju.director = null;
     };
   }, []);
 
@@ -60,16 +81,29 @@ export default function KaijuPair() {
     ctx.player.x = player.body.x;
     ctx.player.z = player.body.z;
 
-    for (const k of kaiju.list) {
+    const fight = kaiju.fight;
+    const list = kaiju.list;
+    fight.begin();
+    kaiju.director.update(dt);
+    ctx.director = kaiju.director;
+    for (let i = 0; i < list.length; i++) {
+      const k = list[i];
       const ctl = k.ctl;
+      const foe = list[1 - i].ctl;
+      ctx.foe = foe;
       const intent = k.brain.think(ctl, ctx, dt);
       const events = ctl.step(intent, dt, k.events);
       for (const e of events) {
         if (e.type === 'footfall') stomp(d, e, cam);
         else if (e.type === 'carve') for (const c of e.capsules) d.applyDamage({ shape: 'capsule', ...c, source: ctl.kind });
       }
-      if (ctl.flying) lightning(k, d, dt, cam);
-      else atomicBreath(k, d, dt, cam);
+      if (FIGHT_ON) fight.resolve(ctl, foe, events, city.buildings);
+      if (ctl.flying) lightning(k, d, dt, cam, fight, foe);
+      else atomicBreath(k, d, dt, cam, fight, foe);
+    }
+    if (FIGHT_ON) {
+      fight.glue();
+      fightEffects(fight, d, cam);
     }
 
     // work through the destruction queue under its budget, then throw what came off as debris
@@ -114,7 +148,7 @@ function stomp(d, e, cam) {
 
 // ---- Godzilla's atomic breath ---------------------------------------------------------
 
-function atomicBreath(k, d, dt, cam) {
+function atomicBreath(k, d, dt, cam, fight, foe) {
   const ctl = k.ctl;
   const w = ctl.weapon;
   const m = ctl.motion;
@@ -166,6 +200,9 @@ function atomicBreath(k, d, dt, cam) {
       addTraumaAt(0.1, _end.x, _end.y, _end.z, cam.x, cam.y, cam.z);
     }
 
+    // the other kaiju in the beam
+    if (FIGHT_ON) fight.beam(ctl, foe, mz.x, mz.y, mz.z, _dir.x, _dir.y, _dir.z, _end.len, dt);
+
     // the player in the beam
     if (distToSegment(player.eyeX, player.eyeY - 0.5, player.eyeZ, mz.x, mz.y, mz.z, _end.x, _end.y, _end.z) < B.playerRadius) {
       hurt((B.playerDamage * dt) / B.fireTime);
@@ -180,7 +217,7 @@ function atomicBreath(k, d, dt, cam) {
 
 // ---- Ghidorah's gravity lightning ------------------------------------------------------
 
-function lightning(k, d, dt, cam) {
+function lightning(k, d, dt, cam, fight, foe) {
   const ctl = k.ctl;
   const w = ctl.weapon;
   const L = KAIJU.lightning;
@@ -193,11 +230,11 @@ function lightning(k, d, dt, cam) {
   k.strike += dt;
   while (k.strike >= L.strikeInterval) {
     k.strike -= L.strikeInterval;
-    for (let h = 0; h < L.heads; h++) strike(k, d, h, cam);
+    for (let h = 0; h < L.heads; h++) strike(k, d, h, cam, fight, foe);
   }
 }
 
-function strike(k, d, h, cam) {
+function strike(k, d, h, cam, fight, foe) {
   const ctl = k.ctl;
   const L = KAIJU.lightning;
   const rng = k.rng;
@@ -212,7 +249,13 @@ function strike(k, d, h, cam) {
   let tz;
   const px = player.body.x;
   const pz = player.body.z;
-  if (rng() < 0.22 && Math.hypot(px - ctl.x, pz - ctl.z) < L.range) {
+  let foeShot = false;
+  if (FIGHT_ON && foe.vulnerable && Math.hypot(foe.x - ctl.x, foe.z - ctl.z) < L.range && rng() < KAIJU.fight.lightningFoeChance) {
+    // aimed at the other kaiju's body
+    foeShot = true;
+    tx = foe.x + (rng() - 0.5) * 12;
+    tz = foe.z + (rng() - 0.5) * 12;
+  } else if (rng() < 0.22 && Math.hypot(px - ctl.x, pz - ctl.z) < L.range) {
     tx = px + (rng() - 0.5) * 8;
     tz = pz + (rng() - 0.5) * 8;
   } else {
@@ -221,7 +264,7 @@ function strike(k, d, h, cam) {
     tx = ctl.x - Math.sin(ang) * dist;
     tz = ctl.z - Math.cos(ang) * dist;
   }
-  const ty = Math.max(GROUND_Y + 1, world.topY(Math.floor(tx), Math.floor(tz)) + 1);
+  const ty = foeShot ? foe.y + (foe.flying ? 0 : 8 + rng() * 40) : Math.max(GROUND_Y + 1, world.topY(Math.floor(tx), Math.floor(tz)) + 1);
 
   const bolt = nextBolt();
   lightningBolt(hx, hy, hz, tx, ty, tz, BOLT_LEVELS, Math.hypot(tx - hx, ty - hy, tz - hz) * 0.06, rng, bolt.pts);
@@ -229,6 +272,7 @@ function strike(k, d, h, cam) {
 
   d.applyDamage({ shape: 'sphere', cx: tx, cy: ty, cz: tz, radius: L.strikeRadius, source: 'lightning', seed: (tx * 5 + tz * 3) | 0 });
   kaiju.stats.strikes++;
+  if (FIGHT_ON) fight.strike(ctl, foe, tx, ty, tz, L.strikeRadius);
   emitDust(tx, ty, tz, 4, 4, 7, 4);
   addTraumaAt(0.2, tx, ty, tz, cam.x, cam.y, cam.z);
   if (Math.hypot(px - tx, pz - tz) < L.playerRadius && Math.abs(player.body.y - ty) < 8) {
@@ -267,4 +311,51 @@ function throwDebris(d) {
   const y = d.ry[0];
   const z = d.rz[0];
   if (n > 40) emitDust(x, y, z, 1, 4, 9, 3);
+}
+
+// ---- what the fight did this frame ------------------------------------------------------------
+
+function fightEffects(fight, d, cam) {
+  const F = KAIJU.fight;
+  for (const e of fight.effects) {
+    switch (e.type) {
+      case 'hit':
+        if (!e.beam) {
+          addTraumaAt(0.4, e.x, e.y, e.z, cam.x, cam.y, cam.z);
+          emitDust(e.x, e.y, e.z, 6, 10, 9, 3);
+          give(F.score.hit, e.x, e.z);
+        }
+        break;
+      case 'grab':
+        announce(`${NAME[e.by.kind]} GRABS ${NAME[e.who.kind]}!`);
+        addTraumaAt(0.3, e.x, e.y, e.z, cam.x, cam.y, cam.z);
+        break;
+      case 'toss':
+        announce(`${NAME[e.by.kind]} HURLS ${NAME[e.who.kind]}!`);
+        addTraumaAt(0.5, e.x, e.y, e.z, cam.x, cam.y, cam.z);
+        break;
+      case 'flightCarve':
+        // the flying body tears through whatever it passes through
+        d.applyDamage({ shape: 'sphere', cx: e.x, cy: e.y, cz: e.z, radius: e.radius, source: 'toss', seed: (e.x * 3 + e.z * 7) | 0 });
+        emitDust(e.x, e.y, e.z, 2, 8, 10, 2);
+        break;
+      case 'impact': {
+        // the landing blast: a big bite out of the skyline and the biggest shake in the game
+        d.applyDamage({ shape: 'sphere', cx: e.x, cy: BASE_Y + 6, cz: e.z, radius: F.impactRadius, source: 'toss', seed: (e.x + e.z) | 0 });
+        addTraumaAt(0.9, e.x, e.y, e.z, cam.x, cam.y, cam.z);
+        emitDust(e.x, BASE_Y + 3, e.z, 40, 22, 20, 7);
+        give(F.score.impact, e.x, e.z);
+        break;
+      }
+      case 'ko':
+        announce(`${NAME[e.who.kind]} IS DOWN!`);
+        give(F.score.ko, e.who.x, e.who.z);
+        break;
+      case 'revive':
+        announce(`${NAME[e.who.kind]} GETS BACK UP`);
+        break;
+      default:
+        break;
+    }
+  }
 }

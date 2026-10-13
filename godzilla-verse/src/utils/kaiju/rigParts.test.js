@@ -76,7 +76,7 @@ describe('godzilla rig', () => {
   });
 });
 
-const motion = (o = {}) => ({ speed: 0, turn: 0, phase: 0, charge: 0, firing: false, roar: 0, stagger: 0, hit: 0, bob: 0, aim: 0, aimPitch: 0, ...o });
+const motion = (o = {}) => ({ speed: 0, turn: 0, phase: 0, charge: 0, firing: false, roar: 0, stagger: 0, hit: 0, bob: 0, aim: 0, aimPitch: 0, attack: 0, grab: 0, lie: 0, pitch: 0, roll: 0, ...o });
 
 describe('poses', () => {
   test('godzilla: every joint stays finite across a gait cycle and while charging/firing', () => {
@@ -100,6 +100,22 @@ describe('poses', () => {
     expect(Math.sign(rig.joints.legL.rotation.x)).toBe(-Math.sign(rig.joints.legR.rotation.x));
   });
 
+  test('godzilla: a swipe winds the right arm back then whips it forward; a grab reaches with both; a hit rocks the torso back', () => {
+    const rig = build(godzillaSpec());
+    poseGodzilla(rig.joints, motion({ attack: -1 }), 0);
+    const back = rig.joints.armR.rotation.x;
+    poseGodzilla(rig.joints, motion({ attack: 1 }), 0);
+    const fwd = rig.joints.armR.rotation.x;
+    expect(back).toBeGreaterThan(fwd + 2);
+    poseGodzilla(rig.joints, motion({ grab: 1 }), 0);
+    expect(rig.joints.armL.rotation.x).toBeLessThan(-1);
+    expect(rig.joints.armR.rotation.x).toBeLessThan(-1);
+    poseGodzilla(rig.joints, motion(), 0);
+    const t0 = rig.joints.torso.rotation.x;
+    poseGodzilla(rig.joints, motion({ stagger: 0.9 }), 0);
+    expect(rig.joints.torso.rotation.x).toBeLessThan(t0 - 0.2);
+  });
+
   test('godzilla: the head ends up pitched to the aim whatever the torso does', () => {
     // total pitch down of torso -> neck -> head should be 0.12 at rest and 0.2 once aimed
     const total = (m) => {
@@ -109,6 +125,7 @@ describe('poses', () => {
     };
     expect(total(motion())).toBeCloseTo(0.12, 2);
     expect(total(motion({ charge: 1, firing: true, aimPitch: -0.2 }))).toBeCloseTo(0.2, 2);
+    expect(total(motion({ charge: 1, firing: true, aimPitch: 0.3 }))).toBeCloseTo(-0.3, 2); // aiming up at a flying foe
   });
 
   test('ghidorah: wings flap in opposite senses to stay symmetric; heads never share a pose', () => {

@@ -24,6 +24,7 @@ import Surroundings from './components/Surroundings';
 import StatsProbe from './components/StatsProbe';
 import { useGame, player, camState, target, stats, city, odm, kaiju } from './store';
 import KaijuPair from './components/kaiju/KaijuPair';
+import KaijuHud from './components/KaijuHud';
 import { fx } from './utils/kaiju/fx';
 import { input } from './utils/input';
 import { IS_TOUCH, SHOW_DEBUG, KAIJU_ON } from './utils/worldSelect';
@@ -123,6 +124,7 @@ export default function App() {
       </GlErrorBoundary>
       <LoadingScreen />
       <Hud />
+      {KAIJU_ON && <KaijuHud />}
       <Crosshair />
       <Hotbar />
       {IS_TOUCH && <MobileControls />}

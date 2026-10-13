@@ -18,6 +18,8 @@ export const WORLD_KIND = w === 'test' ? 'test' : w === 'synthetic' ? 'synthetic
 export const KAIJU_ON = params.get('kaiju') ? params.get('kaiju') !== '0' : WORLD_KIND === 'city';
 // ODM gas is unlimited by default; ?gas=limited brings back the gas meter's costs
 export const UNLIMITED_GAS = params.get('gas') !== 'limited';
+// the kaiju fight each other (phase 7); ?fight=0 falls back to the phase-6 wandering
+export const FIGHT_ON = KAIJU_ON && params.get('fight') !== '0';
 export const USE_WORKERS = params.get('workers') !== '0';
 export const RENDER_DIST_OVERRIDE = Number(params.get('rd')) || undefined;
 

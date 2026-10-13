@@ -20,6 +20,10 @@ export const KAIJU = {
     bodyCarveHeight: 46,
     bodyCarveInterval: 0.1,
     muzzle: { y: 6.2, fwd: 1.9 }, // jaw position in authoring units (x scale)
+    meleeReach: 30, // centre-to-centre distance a claw swipe can land
+    meleeDamage: 70,
+    grabReach: 26,
+    com: 35, // centre of mass above the feet, in blocks (tumbling pivots here)
     spawn: { x: 197, z: 112, yaw: Math.PI }, // north of the park, walking south toward the spawn
   },
 
@@ -35,6 +39,10 @@ export const KAIJU = {
     bodyCarveRadius: 7,
     bodyCarveHeight: 16,
     bodyCarveInterval: 0.12,
+    meleeReach: 38,
+    meleeDamage: 60,
+    grabReach: 30,
+    com: 0, // hover height is already the body centre
     spawn: { x: 120, z: 150, yaw: -Math.PI / 2 },
   },
 
@@ -70,6 +78,33 @@ export const KAIJU = {
     radius: 4,
     playerRadius: 10,
     playerDamage: 20,
+  },
+
+  // the fight (phase 7)
+  fight: {
+    gravity: 30,
+    launchSpeed: 52, // m/s along the toss
+    launchDeg: 28,
+    throwMinRange: 50, // a tossed kaiju is aimed at the tallest building this far away...
+    throwMaxRange: 170,
+    throwConeDeg: 70, // ...within this cone ahead of the thrower
+    throwCarveRadius: 11, // carved along the whole flight path (centre of mass)
+    throwCarveInterval: 0.1,
+    impactRadius: 20, // the landing blast
+    melee: { windup: 0.55, active: 0.2, recover: 0.55, cooldown: 1.4, knockback: 7 },
+    grab: { reach: 0.6, hold: 1.1, release: 0.7, cooldown: 6 },
+    stagger: 0.9, // a hit this big (or bigger) interrupts what the target was doing
+    staggerMin: 40,
+    downTime: 3.5, // lying after a toss
+    koDown: 7, // lying after a knockout
+    reviveFrac: 0.4, // health it gets up with after a KO
+    impactDamage: 220,
+    beamDps: 95, // atomic breath damage per second on a kaiju (a full 2.5 s sweep that stays on it ~240)
+    lightningDamage: 14, // per strike that lands on a kaiju
+    lightningFoeChance: 0.45, // chance a bolt is aimed at the other kaiju
+    beamGap: 2, // seconds after one beam ends before the Director allows another
+    leash: 170, // the fight is pulled back toward the player when its centre is further than this
+    score: { hit: 40, impact: 250, ko: 1000, witnessRange: 260 }, // spectacle points, only when the player is this close
   },
 
   // destruction

@@ -53,8 +53,9 @@ lives only in the main checkout. Deploy from the main checkout.
 | 4 The city (generator, sky, fog, lighting, loading screen) | **done** |
 | 5 ODM gear + swing camera | **done** |
 | 6 Kaiju rigs + placeholder carving (destruction seam, beams, debris/dust, intent contract) | **done** |
-| 7 Combat FSM + Director | next |
-| 8–10 | see plan |
+| 7 Combat FSM + Director (melee, grab, toss, HP, KO, score, title cards) | **done** |
+| 8 Beam clash + shockwave + bloom | next |
+| 9–10 | see plan |
 
 ### Phase 0 — what exists
 - `src/utils/atlas.js` — the real procedural texture atlas (17 tiles, 16 px content in
@@ -107,7 +108,7 @@ lives only in the main checkout. Deploy from the main checkout.
 `?world=test` is the 64x64 engine test world (daytime; what `play-check`/`touch-check` use) and
 `?world=synthetic` the phase-2 box-tower perf-gate world; `?time=day|dusk|night` (dusk for the city, day for
 the others); `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in
-it at the spawn); `?wire=1` starts in wireframe; `?kaiju=0|1` turns the kaiju off/on (on in the city, off in the test worlds); `?gas=limited` turns ODM gas costs back on (unlimited by default); `?workers=0` meshes and generates on the main thread;
+it at the spawn); `?wire=1` starts in wireframe; `?kaiju=0|1` turns the kaiju off/on (on in the city, off in the test worlds); `?fight=0` keeps them but stops them fighting (phase-6 wandering); `?gas=limited` turns ODM gas costs back on (unlimited by default); `?workers=0` meshes and generates on the main thread;
 `?rd=N` sets the render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on
 touch devices). Handy for reproducible screenshots, e.g. the border cube: `?world=test&cam=16,36,44,0,-14`.
 
@@ -394,8 +395,52 @@ meshes + ~15 outlines + effects pools); downtown looking at them lands at **430�
 
 **Not verified (needs a real GPU/hands):** real-GPU frame rate with the kaiju, how the weapons *feel*, whether the kaiju read as
 Godzilla/Ghidorah to *you* (judged only from software-GL screenshots at dusk), real-mouse input, a phone, the live FTP deploy.
-Known gaps (by design, later phases): kaiju ignore each other and the player (phase 7), no beam clash/bloom (phase 8), no audio or
+Known gaps at the end of phase 6 (since closed by phase 7: they now fight each other): no beam clash/bloom (phase 8), no audio or
 playable kaiju (phase 9), debris is ballistic cubes and collapse is a scripted top-down shave, not physics (phase 10).
+
+### Phase 7 — the fight (what exists)
+The two kaiju now fight each other. `?fight=0` brings back the phase-6 wandering (and no damage between them).
+
+- **Actions** (`utils/kaiju/controller.js`): besides the weapon machine a kaiju is in exactly one action: `none | melee | grab |
+  stagger | held | thrown | downed`. The controller owns the timings and raises events; it never decides what a swing *hits*.
+  Melee = windup 0.55 s / active 0.2 s / recover 0.55 s (a claw swipe for Godzilla, a neck lunge for Ghidorah); a grab reaches
+  (0.6 s), then holds (1.1 s), then tosses; a hit of >= 40 damage staggers (interrupts melee/grab/weapon, but not a hold in
+  progress); zero health = knocked out. `hurt()`, `hitSegment()`, `beginHold/beginHeld/beginThrow` are the fight's hooks.
+- **The fight** (`utils/kaiju/fight.js`, pure): the one place that sees both kaiju. It resolves melee (reach + facing cone),
+  grabs (the foe is glued 14 blocks ahead of the holder, held off the ground, facing it), and the **toss** (52 m/s at 28°, aimed at
+  the tallest building 50–170 blocks ahead within a 70° cone), drops a held kaiju if its holder is interrupted/knocked out, and applies
+  beam damage (95/s through the body) and lightning-strike damage (14 each) on the other kaiju. A tossed kaiju is ballistic, tumbles
+  about its centre of mass, and every 0.1 s emits a `flightCarve`; the landing emits `impact` (fall damage 220, knocked down 3.5 s).
+  **Knockout**: lies down 7 s, then gets up with 40% health. A downed kaiju can't be hit (no pile-on).
+- **The brain** (`utils/kaiju/combat.js`): `CombatBrain` speaks only the intent contract (new optional `aimPitch`). It closes in,
+  circles (strafing keeps it facing the foe), breathes when the Director allows and the foe is ahead and in range, and in reach
+  chooses swipe / grab / back off; it stands over a downed foe rather than kicking it. `brain.force = 'melee' | 'grab' | 'beam'` for
+  tests and scripted beats (`forceBeam` still works too).
+- **The Director** (`utils/kaiju/director.js`): never two signature weapons at once (a 2 s gap after one ends — the beam clash,
+  phase 8, is the scripted exception) and a **leash**: when the fight's centre is more than 170 blocks from the player both kaiju are
+  pulled back toward them.
+- **In the world** (`components/kaiju/KaijuPair.jsx` `fightEffects`): `flightCarve` carves a radius-11 sphere along the flight path,
+  `impact` a radius-20 blast (+ 0.9 trauma, a big dust cloud, debris), hits shake the camera, and the title cards ("GODZILLA GRABS
+  KING GHIDORAH!", "... HURLS ...", "... IS DOWN!", "... GETS BACK UP"). **The ground is still never carved** (floor at GROUND_Y + 2).
+- **Rig poses** (`rigAnim.js`, `KaijuRig.jsx`): swipe/lunge, a two-armed reach for a grab, stagger rock-back, the head pitched to
+  the foe (`aimPitch`), tumbling about the centre of mass while thrown, lying down (Godzilla on his back, Ghidorah belly-down with a
+  wing out) and getting up.
+- **HUD** (`components/KaijuHud.jsx`): a health bar per kaiju under the score and the title card, polled at 10 Hz.
+  **Score**: spectacle points added to the player's bonus only while they are within 260 blocks (hit 40, landing 250, knockout 1 000).
+- Constants: `KAIJU.fight` in `constants/kaijuConfig.js` (and `meleeReach/meleeDamage/grabReach/com` per kaiju).
+
+**Verified in phase 7:** `bun test` 200 tests (the fight, Director and brain: swipe lands/misses/staggers with the right timings,
+grab connects/whiffs, toss speed and aim and landing, drop on interrupt, no stagger out of a hold, knockout and revival, beams and
+strikes on the foe, Director gating and leash, and a headless 4-minute duel on 6 seeds that always produces hits, grabs and knockouts
+and never leaves anyone helpless forever). `bench/fight-check.mjs` (23 checks in the real city, production build): swipe lands for
+exactly 70, a grab holds Ghidorah 14 blocks ahead at y≈59, the toss lands with 220 fall damage and a ~9 700-voxel hole (buildings
+collapsed), a knockout gets up with 560 HP, the AI breathes and brawls on its own, the Director never lets both breathe at once, the
+leash pulls a far-off fight back, title cards + bars show, `?fight=0` turns it off. Phase 3–6 checks still pass.
+
+**Not verified:** how the fight *reads* to a person (pacing, whether it is too chaotic or too passive, toss readability) — only
+software-GL screenshots, from a free camera; real-GPU frame rate during a collapse; no player-vs-kaiju combat (by design: the
+player is a spectator who can be hurt). Known simplifications: melee hit-testing is horizontal distance + a facing cone (no
+vertical reach); a held kaiju is positioned, not animated gripping; the toss aims at a building, not at a precise spot.
 
 ### Browser checks
 The gstack `browse` tool cannot create a WebGL context, and Chrome's `--virtual-time-budget` freezes
@@ -414,6 +459,7 @@ Gameplay and touch have their own scripts (same setup, `PORT=1341` for a product
 ~/.nvm/versions/node/v24.13.0/bin/node bench/odm-check.mjs /tmp/odm              # ODM gear in the city, 17 checks
 ~/.nvm/versions/node/v24.13.0/bin/node bench/kaiju-check.mjs /tmp/kaiju          # both kaiju: stomp, collapse, breath, lightning, 22 checks
 ~/.nvm/versions/node/v24.13.0/bin/node bench/kaiju-shots.mjs /tmp/kaiju-shots    # free-camera screenshots of both kaiju for review
+~/.nvm/versions/node/v24.13.0/bin/node bench/fight-check.mjs /tmp/fight          # melee, grab + toss, knockout, Director, leash, HUD, 23 checks
 ```
 (Run them by **absolute path** or from `godzilla-verse/`; a `cd` into `bench/` breaks the relative path.)
 Software GL runs at a few fps and the game clamps dt to 1/30, so simulated time runs slower than wall time:

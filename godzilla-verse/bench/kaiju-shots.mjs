@@ -34,7 +34,7 @@ async function waitFor(fn, arg, timeoutMs = 120000) {
 }
 
 // camera: above the roofs (126), 125 blocks south of the action, looking north and down a little
-await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?cam=197,140,338,0,-13&debug=0&time=${process.env.TIME || 'dusk'}`);
+await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?cam=197,140,338,0,-13&debug=0&fight=0&time=${process.env.TIME || 'dusk'}`);
 await waitFor(() => window.__gv && window.__gv.city.ready);
 await waitFor(() => window.__gv.kaiju.list.length === 2);
 

@@ -18,7 +18,13 @@ const _sphere = new THREE.Sphere();
 
 export default function KaijuRig({ ctl }) {
   const group = useRef();
+  const mid = useRef();
   const flying = ctl.flying;
+  // pivot height (authoring units) and the pose when lying down: Godzilla falls on his back, Ghidorah belly-down with a wing splayed
+  const COM = flying ? 0 : 3.5;
+  const LIE_CENTER = flying ? 0 : 1.3;
+  const LIE_X = flying ? 0.5 : -1.45;
+  const LIE_Z = flying ? 0.6 : 0;
 
   const rig = useMemo(() => {
     const material = flying ? kaijuMaterial('#ffd45a', { doubleSided: true }) : kaijuMaterial('#4cc7ff');
@@ -43,6 +49,11 @@ export default function KaijuRig({ ctl }) {
     const t = ctl.time;
     g.position.set(ctl.x, ctl.y, ctl.z);
     g.rotation.y = ctl.yaw + Math.PI; // rigs are authored facing +z; yaw 0 faces -z
+
+    // tumbling (thrown) and lying down (downed) rotate about the centre of mass, which sinks as it lies
+    const lie = m.lie;
+    mid.current.position.y = COM * (1 - lie) + LIE_CENTER * lie;
+    mid.current.rotation.set(m.pitch + lie * LIE_X, 0, m.roll + lie * LIE_Z);
 
     const u = rig.material.userData.uniforms;
     if (flying) {
@@ -81,7 +92,11 @@ export default function KaijuRig({ ctl }) {
 
   return (
     <group ref={group} scale={KAIJU.scale}>
-      <primitive object={rig.root} />
+      <group ref={mid} position={[0, COM, 0]}>
+        <group position={[0, -COM, 0]}>
+          <primitive object={rig.root} />
+        </group>
+      </group>
     </group>
   );
 }

@@ -28,20 +28,25 @@ export function poseGodzilla(J, m, t) {
   set(J.hips, 0, 0, swing * 0.04 * sp);
 
   // torso twists against the hips, leans back to inhale while charging, forward as it fires
-  const torsoX = breathe - charge * 0.14 + fire * 0.22;
+  const stag = Math.min(1, m.stagger / 0.9);
+  const atk = m.attack; // -1 winding up .. +1 striking
+  const torsoX = breathe - charge * 0.14 + fire * 0.22 - stag * 0.3;
   const neckX = -charge * 0.12 + fire * 0.12 - m.roar * 0.25;
-  set(J.torso, torsoX, -swing * 0.07 * sp, 0);
-  set(J.armL, -swing * 0.3 * sp - charge * 0.2, 0, 0.05 + m.roar * 0.5);
-  set(J.armR, swing * 0.3 * sp - charge * 0.2, 0, -0.05 - m.roar * 0.5);
+  const twist = atk > 0 ? -atk * 0.45 : -atk * 0.3; // wind up one way, whip the other
+  set(J.torso, torsoX, -swing * 0.07 * sp + twist, 0);
+  // the claw swipe uses the right arm (back on the windup, across on the strike); a grab reaches with both
+  const swipe = atk < 0 ? -atk * 1.3 : -atk * 2.1;
+  set(J.armL, -swing * 0.3 * sp - charge * 0.2 - m.grab * 1.6, 0, 0.05 + m.roar * 0.5 + m.grab * 0.15);
+  set(J.armR, swing * 0.3 * sp - charge * 0.2 + swipe - m.grab * 1.6, 0, -0.05 - m.roar * 0.5 - m.grab * 0.15);
 
   // head: the chain torso -> neck -> head is pitched so the HEAD ends up looking 0.12 rad down
   // (0.2 while a beam is out, matching m.aimPitch), rearing back while it charges; yaw splits
   // 35/65 between neck and head so the total equals m.aim, i.e. where the beam goes.
   const aimBlend = Math.min(1, charge * 3);
-  const headPitch = 0.12 + 0.08 * aimBlend - charge * 0.15 * (1 - fire);
+  const headPitch = 0.12 + (-m.aimPitch - 0.12) * aimBlend - charge * 0.15 * (1 - fire);
   set(J.neck, neckX, m.aim * 0.35, 0);
-  set(J.head, headPitch - (0.25 + torsoX + 0.2 + neckX - 0.05), m.aim * 0.65, 0);
-  set(J.jaw, charge * 0.18 + fire * 0.5 + m.roar * 0.55, 0, 0);
+  set(J.head, headPitch - (0.25 + torsoX + 0.2 + neckX - 0.05) - stag * 0.35, m.aim * 0.65, 0);
+  set(J.jaw, charge * 0.18 + fire * 0.5 + m.roar * 0.55 + (atk > 0 ? atk * 0.4 : 0) + stag * 0.4, 0, 0);
 
   // tail: a travelling wave, wider at speed, swung opposite the turn
   const N = GODZILLA_TAIL_SEGMENTS;
@@ -65,18 +70,22 @@ export function poseGhidorah(J, m, t) {
   set(J.wingR2, 0, 0, Math.sin(f - 1.0) * 0.4 - 0.1);
   set(J.wingL2, 0, 0, -Math.sin(f - 1.0) * 0.4 + 0.1);
 
-  // body banks into turns and noses down at speed
-  set(J.body, m.speed * 0.1 + Math.cos(f) * 0.03, 0, -m.turn * 0.18);
+  const stag = Math.min(1, m.stagger / 0.9);
+  const atk = m.attack; // -1 winding up .. +1 lunging
+
+  // body banks into turns and noses down at speed (and rocks back when hit)
+  set(J.body, m.speed * 0.1 + Math.cos(f) * 0.03 - stag * 0.3, 0, -m.turn * 0.18);
 
   // three necks, each with its own phase so the heads never sync; they rear back to charge and lunge to fire
   for (let k = 0; k < 3; k++) {
     const ph = k * 1.9;
     for (let i = 0; i < GHIDORAH_NECK_SEGMENTS; i++) {
       const sway = Math.sin(t * 0.9 + ph + i * 0.7) * 0.22 + (k - 1) * fire * 0.12;
-      const nod = Math.sin(t * 0.7 + ph * 1.3 + i * 0.5) * 0.1 - charge * 0.14 + fire * 0.16;
+      const lunge = atk < 0 ? atk * 0.25 : atk * 0.35; // rear back, then strike
+      const nod = Math.sin(t * 0.7 + ph * 1.3 + i * 0.5) * 0.1 - charge * 0.14 + fire * 0.16 + lunge - stag * 0.15;
       set(J[`neck${k}_${i}`], nod, sway, 0);
     }
-    set(J[`head${k}`], -charge * 0.25 + fire * 0.5 + Math.sin(t * 1.3 + ph) * 0.08, Math.sin(t * 0.6 + ph) * 0.15, 0);
+    set(J[`head${k}`], -charge * 0.25 + fire * 0.5 + Math.sin(t * 1.3 + ph) * 0.08 + (atk > 0 ? atk * 0.6 : atk * 0.3), Math.sin(t * 0.6 + ph) * 0.15, 0);
   }
 
   for (let k = 0; k < 2; k++) {

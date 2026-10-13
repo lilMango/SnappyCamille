@@ -60,6 +60,9 @@ export const city = {
 export const kaiju = {
   list: [],
   destruction: null,
+  fight: null, // Fight (hits, grabs, tosses) while the kaiju are fighting
+  director: null,
+  announce: { text: '', until: 0, id: 0 }, // the current title card
   stats: { stomps: 0, bores: 0, strikes: 0, debris: 0, playerHits: 0 },
 };
 
