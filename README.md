@@ -10,10 +10,12 @@ SnappyCamille/
 │   ├── index.html           # Root redirect
 │   ├── bday33/              # Birthday Music World app
 │   ├── galaxy/              # Camille Galaxy app
-│   └── lanikai/             # Lanikai Galaxy app
+│   ├── lanikai/             # Lanikai Galaxy app
+│   └── godzilla-verse/      # Godzilla-Verse app
 ├── birthday-music-world/    # Source code (separate git repo)
 ├── camille-galaxy/          # Source code (separate git repo)
 ├── lanikai-galaxy/          # Source code (separate git repo)
+├── godzilla-verse/          # Source code (voxel city + kaiju)
 ├── deploy.sh                # FTP deploy script
 └── .env                     # FTP credentials (not committed)
 ```
@@ -58,4 +60,5 @@ This uploads everything in `public/` to your server root.
 | `/bday33` | birthday-music-world | Interactive pixel-art music room |
 | `/galaxy` | camille-galaxy | 3D Getty Villa on a small planet |
 | `/lanikai` | lanikai-galaxy | 3D Kualoa Ranch & Lanikai Beach on a small planet |
+| `/godzilla-verse` | godzilla-verse | Voxel city, ODM traversal, Godzilla vs King Ghidorah |
 | `/cnm-world` | cnm-world | 2D pixel-art world engine |

@@ -38,3 +38,4 @@ Requires `.env` with FTP credentials (copy from `.env.example`). Uses lftp for m
 | `/cnm-world` | cnm-world/ | 2D pixel-art world engine (React, Vite, room-based exploration) |
 | `/galaxy` | camille-galaxy/ | 3D Mario-Galaxy-style Getty Villa on a small planet (Vite + React Three Fiber, spherical walking, follow camera, music zones) |
 | `/lanikai` | lanikai-galaxy/ | 3D Wii-Sports-Resort-style Kualoa Ranch & Lanikai Beach on a small planet (Vite + React Three Fiber, spherical walking, follow camera, music zones) |
+| `/godzilla-verse` | godzilla-verse/ | Minecraft-style voxel city: ODM-gear traversal, Godzilla vs King Ghidorah, block destruction (Vite + React Three Fiber, chunked voxel world, worker meshing). Built in phases — see its CLAUDE.md |
