@@ -107,7 +107,7 @@ lives only in the main checkout. Deploy from the main checkout.
 `?world=test` is the 64x64 engine test world (daytime; what `play-check`/`touch-check` use) and
 `?world=synthetic` the phase-2 box-tower perf-gate world; `?time=day|dusk|night` (dusk for the city, day for
 the others); `?cam=x,y,z,yawDeg,pitchDeg` starts in the **free camera** at that pose (and `?free=1` starts in
-it at the spawn); `?wire=1` starts in wireframe; `?kaiju=0|1` turns the kaiju off/on (on in the city, off in the test worlds); `?workers=0` meshes and generates on the main thread;
+it at the spawn); `?wire=1` starts in wireframe; `?kaiju=0|1` turns the kaiju off/on (on in the city, off in the test worlds); `?gas=limited` turns ODM gas costs back on (unlimited by default); `?workers=0` meshes and generates on the main thread;
 `?rd=N` sets the render distance in chunks; `?debug=1|0` forces the debug overlays on/off (off by default on
 touch devices). Handy for reproducible screenshots, e.g. the border cube: `?world=test&cam=16,36,44,0,-14`.
 
@@ -310,6 +310,7 @@ Attack-on-Titan style 3D manoeuvre gear: two hooks, a rope you swing on, reel, b
   travel, 55 m/s cap (enforced after gravity too). **Pump**: forward input on the downswing adds speed along the arc.
 - **Gas** (100): hook -10, rope upkeep -4/s each, reel -10/s, boost -20/s, dash -18; refills +25/s on the ground after
   0.4 s without spending, +6/s in the air after 1.5 s. At 0 you can't reel, boost or fire (you still swing).
+- **Unlimited gas (default)**: `ODM.unlimitedGas` makes every gas cost a no-op, so the bar stays full; `?gas=limited` brings the costs below back (the unit tests and `odm-check` run with them on).
 - **Anchors die with their block**: if the anchored block is destroyed the rope drops (a kaiju beam cutting your rope
   mid-swing is a feature, phase 6+).
 - `components/Player.jsx` — controller around it: on the ground you ease to the wanted velocity; **in the air you steer

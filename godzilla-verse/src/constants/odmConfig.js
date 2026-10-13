@@ -1,3 +1,5 @@
+import { UNLIMITED_GAS } from '../utils/worldSelect';
+
 // ODM gear tuning (Attack-on-Titan style 3D manoeuvre gear). 1 block = 1 m.
 //
 // The rope is a hard distance constraint, not a spring: it removes only the *outward*
@@ -6,6 +8,7 @@
 
 export const ODM = {
   // ---- gas ----
+  unlimitedGas: UNLIMITED_GAS, // nothing costs gas (the bar stays full); ?gas=limited turns the costs back on
   gasMax: 100,
   shotCost: 10, // per hook fired
   upkeep: 4, // per second, per attached rope

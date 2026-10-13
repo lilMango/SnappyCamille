@@ -57,7 +57,7 @@ const state = () =>
     };
   });
 
-await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?kaiju=0`);
+await page.goto(`http://localhost:${process.env.PORT || 1340}/godzilla-verse/?kaiju=0&gas=limited`);
 await waitFor(() => window.__gv && window.__gv.city.ready);
 await waitFor(() => window.__gv.player.body.grounded, null, 30000);
 

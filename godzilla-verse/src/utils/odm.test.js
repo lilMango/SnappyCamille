@@ -7,6 +7,9 @@ import { ODM } from '../constants/odmConfig';
 import { PLAYER } from '../constants/playerConfig';
 import { B } from '../constants/blocks';
 
+// the gas rules are tested with the costs on (the game default is unlimited gas)
+ODM.unlimitedGas = false;
+
 const CHEST = ODM.chestHeight;
 
 function player(x, y, z) {
@@ -436,5 +439,25 @@ describe('gas', () => {
     b.vx = 200;
     odmUpdate(w, odm, b, NO_INPUT(), 1 / 60);
     expect(Math.hypot(b.vx, b.vy, b.vz)).toBeLessThanOrEqual(ODM.maxSpeed + 1e-6);
+  });
+});
+
+describe('unlimited gas (the default)', () => {
+  test('hooks, reel, boost and dash cost nothing', () => {
+    ODM.unlimitedGas = true;
+    try {
+      const odm = createOdm();
+      const w = new VoxelWorld();
+      attach(w, odm, 1, 0.5, 80, 0.5, 20);
+      const b = player(10, 70, 0.5);
+      const io = NO_INPUT();
+      io.hook = [true, true];
+      io.reel = io.boost = io.dash = true;
+      for (let i = 0; i < 90; i++) frame(w, odm, b, io);
+      expect(attachedCount(odm)).toBeGreaterThan(0);
+      expect(odm.gas).toBe(ODM.gasMax);
+    } finally {
+      ODM.unlimitedGas = false;
+    }
   });
 });

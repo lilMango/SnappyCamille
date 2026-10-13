@@ -201,6 +201,7 @@ export function odmConstraint(odm, b) {
 // ---- per frame ---------------------------------------------------------------------------
 
 function spend(odm, amount) {
+  if (ODM.unlimitedGas) return;
   odm.gas = Math.max(0, odm.gas - amount);
   odm.gasIdle = 0;
 }
