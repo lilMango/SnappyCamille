@@ -311,6 +311,12 @@ Attack-on-Titan style 3D manoeuvre gear: two hooks, a rope you swing on, reel, b
   travel, 55 m/s cap (enforced after gravity too). **Pump**: forward input on the downswing adds speed along the arc.
 - **Gas** (100): hook -10, rope upkeep -4/s each, reel -10/s, boost -20/s, dash -18; refills +25/s on the ground after
   0.4 s without spending, +6/s in the air after 1.5 s. At 0 you can't reel, boost or fire (you still swing).
+- **Reel climbs smoothly** (`utils/odm.js`, `constants/odmConfig.js`): reeling used to whip you over the anchor on a short rope
+  (full angular-momentum pump plus a 20 m/s² zip pull: a 47 m/s loop on a 3 m rope, vertical speed swinging ±40 m/s). Now the pump
+  is `reelPump` (0.6) and the zip is `zipAccel` (10), both faded out between `reelFadeMin` (10 m) and `reelFadeMax` (18 m) of rope:
+  a long swing still builds up, and the last stretch is a steady pull to the hook (vertical jerk ~1 m/s per frame, top speed ~15).
+  The climb stops at anchor height while attached (the rope is a hard constraint); letting go on the way up is a ballistic arc that
+  matches its energy prediction (checked: released at 80 m going up at 8 m/s, flew to 80.5 vs 80.5 predicted).
 - **Hooks aim high**: every shot is tilted `aimLiftDeg` (12°) above the crosshair, and tries first for a roof corner at least `highSnapRise` (8) above your feet inside a `highSnapDeg` (32°) cone around that lifted aim, then the lifted ray, the plain ray, and the old sky-snap. A rope from above lifts you; one from chest height only drags you sideways.
 - **Unlimited gas (default)**: `ODM.unlimitedGas` makes every gas cost a no-op, so the bar stays full; `?gas=limited` brings the costs below back (the unit tests and `odm-check` run with them on).
 - **Anchors die with their block**: if the anchored block is destroyed the rope drops (a kaiju beam cutting your rope

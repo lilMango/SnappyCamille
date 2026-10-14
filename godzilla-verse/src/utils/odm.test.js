@@ -191,14 +191,42 @@ describe('reel, boost, dash', () => {
     return { w, odm, b, io };
   }
 
-  test('reeling in shortens the rope and speeds you up (angular momentum)', () => {
-    const { w, odm, b, io } = atBottom();
-    for (let i = 0; i < 4; i++) frame(w, odm, b, io);
-    const v0 = Math.hypot(b.vx, b.vy, b.vz);
+  test('reeling in shortens the rope and adds energy to the swing (versus the same swing not reeled)', () => {
+    // energy per kg: kinetic + gravitational, so the comparison counts height as well as speed
+    const energy = (b) => 0.5 * (b.vx * b.vx + b.vy * b.vy + b.vz * b.vz) + PLAYER.gravity * b.y;
+    const run = (reel) => {
+      const { w, odm, b, io } = atBottom();
+      for (let i = 0; i < 4; i++) frame(w, odm, b, io);
+      io.reel = reel;
+      for (let i = 0; i < 30; i++) frame(w, odm, b, io);
+      return { e: energy(b), len: odm.anchors[1].len };
+    };
+    const reeled = run(true);
+    const coast = run(false);
+    expect(reeled.len).toBeLessThan(20 - 5);
+    expect(reeled.e).toBeGreaterThan(coast.e + 5);
+  });
+
+  test('reeling from rest is a steady pull up to the hook, not a whirl over the anchor (no vertical jerk)', () => {
+    // hang at rest 16 blocks out from a hook 20 above the rope's low point, then reel the whole way
+    const w = new VoxelWorld();
+    const odm = createOdm();
+    attach(w, odm, 1, 0.5, 80, 0.5, 20);
+    const b = player(16.5, 80 - Math.sqrt(20 * 20 - 16 * 16) - CHEST, 0.5);
+    const io = NO_INPUT();
+    io.hook = [false, true];
     io.reel = true;
-    for (let i = 0; i < 30; i++) frame(w, odm, b, io);
-    expect(odm.anchors[1].len).toBeLessThan(20 - 5);
-    expect(Math.hypot(b.vx, b.vy, b.vz)).toBeGreaterThan(v0 * 1.25);
+    let prev = null;
+    let jerk = 0;
+    for (let i = 0; i < 480; i++) {
+      odm.gas = ODM.gasMax; // the reel's gas runs out after ~7 s otherwise, and that stop is the jerk this test is not about
+      frame(w, odm, b, io);
+      if (i > 60 && prev !== null) jerk = Math.max(jerk, Math.abs(b.vy - prev));
+      prev = b.vy;
+    }
+    // gravity alone changes vy by ~0.5 m/s per frame; a whirl over the anchor at 45 m/s changed it by 10+
+    expect(jerk).toBeLessThan(3);
+    expect(Math.hypot(b.vx, b.vy, b.vz)).toBeLessThan(ODM.maxSpeed * 0.6);
   });
 
   test('the rope never reels shorter than the minimum, and regrows when you let go', () => {

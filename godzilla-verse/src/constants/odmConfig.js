@@ -35,8 +35,11 @@ export const ODM = {
   reelSpeed: 18, // m/s the rope shortens
   minLen: 3,
   regrow: 3, // m/s the rope lengthens back toward its fired length once you stop reeling
-  zipAccel: 20, // extra pull toward the anchor while reeling
+  zipAccel: 10, // extra pull toward the anchor while reeling (faded out on a short rope, see reelFade)
   reelSpinMax: 1.25, // per-frame cap on the angular-momentum speed-up while reeling
+  reelPump: 0.6, // share of the angular-momentum speed-up while reeling (1 = full conservation: a whip, 47 m/s on a 3 m rope)
+  reelFadeMin: 10, // below this rope length the reel's pump and zip fade out: they whirl you over the anchor
+  reelFadeMax: 18, // ...and above this rope length they are at full strength (so a long swing still builds up)
   iterations: 3, // Gauss-Seidel passes, so two ropes at once converge
 
   // ---- movement ----

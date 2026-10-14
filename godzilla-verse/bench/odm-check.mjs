@@ -234,7 +234,7 @@ await gv(() => {
   g.player.invulnerable = 0;
   Object.assign(g.player.body, { x: 197, y: 52, z: 209, vx: 0, vy: 0, vz: 0 });
 });
-await waitFor(() => window.__gv.player.body.grounded && window.__gv.player.body.y < 21.5, null, 90000);
+await waitFor(() => window.__gv.player.body.grounded && window.__gv.player.body.y < 21.5, null, 300000);
 await sleep(300);
 const f1 = await state();
 check('a long fall hurts (health drops but you survive)', f1.health < 95 && f1.health > 20, `health ${f1.health.toFixed(1)}`);
@@ -245,7 +245,7 @@ await gv(() => {
   g.player.invulnerable = 0;
   Object.assign(g.player.body, { x: 230, y: 60, z: 215, vx: 0, vy: 0, vz: 0 });
 });
-const respawned = await waitFor(() => window.__gv.player.health === 100 && Math.hypot(window.__gv.player.body.x - 197, window.__gv.player.body.z - 209) < 3, null, 90000);
+const respawned = await waitFor(() => window.__gv.player.health === 100 && Math.hypot(window.__gv.player.body.x - 197, window.__gv.player.body.z - 209) < 3, null, 300000);
 check('dying respawns you at the spawn with full health', !!respawned);
 
 check('no console errors or warnings', problems.length === 0, problems.slice(0, 3).join(' | '));

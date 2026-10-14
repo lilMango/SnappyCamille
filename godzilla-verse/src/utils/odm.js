@@ -330,6 +330,10 @@ export function odmUpdate(world, odm, b, io, dt) {
       a.len = Math.max(ODM.minLen, oldLen - ODM.reelSpeed * dt);
       // Angular momentum: shorten the rope and the tangential speed grows by oldLen / newLen.
       // (Positional projection alone would just lift you and lose speed; this is the "pump".)
+      // The pump and the zip are what whirl you over the anchor on a short rope (a 47 m/s loop on a 3 m
+      // rope). Fade both out as the rope gets short, so the long part of a reel builds swing and the
+      // last stretch is a steady pull up to the hook.
+      const fade = Math.max(0, Math.min(1, (a.len - ODM.reelFadeMin) / (ODM.reelFadeMax - ODM.reelFadeMin)));
       if (a.len < oldLen) {
         const nx = b.x - a.x;
         const ny = b.y + chest - a.y;
@@ -339,7 +343,8 @@ export function odmUpdate(world, odm, b, io, dt) {
         const uy = ny / nl;
         const uz = nz / nl;
         const vr = b.vx * ux + b.vy * uy + b.vz * uz;
-        const k = Math.min(ODM.reelSpinMax, oldLen / a.len);
+        // full conservation (oldLen / newLen) is a whip; blend toward 1 so the climb is a steady pull
+        const k = 1 + (Math.min(ODM.reelSpinMax, oldLen / a.len) - 1) * ODM.reelPump * fade;
         b.vx = ux * vr + (b.vx - ux * vr) * k;
         b.vy = uy * vr + (b.vy - uy * vr) * k;
         b.vz = uz * vr + (b.vz - uz * vr) * k;
@@ -348,9 +353,10 @@ export function odmUpdate(world, odm, b, io, dt) {
       const dy = a.y - (b.y + chest);
       const dz = a.z - b.z;
       const d = Math.hypot(dx, dy, dz) || 1;
-      b.vx += (dx / d) * ODM.zipAccel * dt;
-      b.vy += (dy / d) * ODM.zipAccel * dt;
-      b.vz += (dz / d) * ODM.zipAccel * dt;
+      const zip = ODM.zipAccel * fade * dt;
+      b.vx += (dx / d) * zip;
+      b.vy += (dy / d) * zip;
+      b.vz += (dz / d) * zip;
     }
   } else {
     for (const a of odm.anchors) if (a.active && a.len < a.len0) a.len = Math.min(a.len0, a.len + ODM.regrow * dt);
